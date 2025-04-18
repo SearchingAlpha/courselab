@@ -1,26 +1,27 @@
-// app/page.js
-// Main landing page (Server Component)
-import HeroSection from '@/components/sections/HeroSection';
-import FeaturesSection from '@/components/sections/FeaturesSection';
-import HowItWorksSection from '@/components/sections/HowItWorksSection';
-import TestimonialsSection from '@/components/sections/TestimonialsSection';
-import WaitlistSection from '@/components/sections/WaitlistSection';
-import FooterMain from '@/components/layout/FooterMain';
+// app/page.jsx
+import Navbar from '@/components/common/Navbar';
+import HeroSection from '@/components/landing/HeroSection';
+import FeaturesSection from '@/components/landing/FeaturesSection';
+import HowItWorksSection from '@/components/landing/HowItWorksSection';
+import TestimonialsSection from '@/components/landing/TestimonialsSection';
+import CtaSection from '@/components/landing/CtaSection';
+import Footer from '@/components/common/Footer';
 
 export const metadata = {
-  title: 'CourseForge - Interactive Learning Platform for Mathematics and Programming',
-  description: 'Master complex topics in mathematics and programming through structured 120-hour courses with customized syllabi, textbooks, exercises and projects.',
+  title: 'CourseForge - Master Complex Topics with AI-Generated Courses',
+  description: 'CourseForge helps you master complex topics in mathematics and programming through structured 120-hour courses with interactive exercises and project-based learning.',
 };
 
 export default function LandingPage() {
   return (
     <main className="min-h-screen bg-white">
+      <Navbar />
       <HeroSection />
       <FeaturesSection />
       <HowItWorksSection />
       <TestimonialsSection />
-      <WaitlistSection />
-      <FooterMain />
+      <CtaSection />
+      <Footer />
     </main>
   );
 }
