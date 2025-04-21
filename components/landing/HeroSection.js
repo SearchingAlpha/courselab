@@ -1,32 +1,9 @@
 'use client';
 
-import { useState } from 'react';
 import Image from 'next/image';
-import { ArrowRight, Check } from 'lucide-react';
+import WaitlistForm from '@/components/common/WaitlistForm';
 
 function HeroSection() {
-  const [email, setEmail] = useState('');
-  const [isSubmitted, setIsSubmitted] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setError('');
-    
-    // Simulate API call to add to waitlist
-    try {
-      // Replace with actual API endpoint when available
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setIsSubmitted(true);
-    } catch (err) {
-      setError('Something went wrong. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   return (
     <section className="relative py-20 lg:py-32 overflow-hidden bg-gradient-to-br from-white to-blue-50">
       {/* Background decorative elements */}
@@ -49,57 +26,7 @@ function HeroSection() {
             </p>
             
             {/* Waitlist Form */}
-            <div className="bg-white p-6 rounded-xl shadow-lg max-w-lg mx-auto lg:mx-0">
-              <h2 className="text-2xl font-semibold mb-4 text-gray-800">
-                Join our waitlist
-              </h2>
-              
-              {isSubmitted ? (
-                <div className="text-left p-4 rounded-lg bg-green-50 border border-green-200 flex items-start gap-3">
-                  <div className="mt-0.5">
-                    <Check size={20} className="text-green-600" />
-                  </div>
-                  <div>
-                    <h3 className="font-medium text-green-800">Thank you for joining!</h3>
-                    <p className="text-green-700 mt-1">We'll notify you when CourseForge is ready for you.</p>
-                  </div>
-                </div>
-              ) : (
-                <form onSubmit={handleSubmit} className="space-y-4">
-                  <div>
-                    <label htmlFor="email" className="block text-sm font-medium text-gray-700 text-left mb-1">
-                      Email address
-                    </label>
-                    <input
-                      type="email"
-                      id="email"
-                      required
-                      className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
-                      placeholder="you@example.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                    />
-                  </div>
-                  
-                  {error && (
-                    <p className="text-red-600 text-sm">{error}</p>
-                  )}
-                  
-                  <button
-                    type="submit"
-                    disabled={isLoading}
-                    className={`w-full py-3 px-6 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium flex items-center justify-center gap-2 transition ${isLoading ? 'opacity-70 cursor-not-allowed' : ''}`}
-                  >
-                    {isLoading ? 'Joining...' : 'Join Waitlist'}
-                    {!isLoading && <ArrowRight size={16} />}
-                  </button>
-                </form>
-              )}
-              
-              <p className="mt-4 text-sm text-gray-600">
-                Be the first to know when we launch. No spam, ever.
-              </p>
-            </div>
+            <WaitlistForm className="max-w-lg mx-auto lg:mx-0" />
           </div>
           
           {/* Right side - Illustration */}

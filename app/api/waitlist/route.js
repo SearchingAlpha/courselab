@@ -1,9 +1,6 @@
 // app/api/waitlist/route.js
-
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import prisma from '@/lib/prisma';
 
 export async function POST(request) {
   try {
@@ -30,10 +27,7 @@ export async function POST(request) {
     
     // Add email to waitlist
     await prisma.waitlist.create({
-      data: { 
-        email,
-        signupDate: new Date()
-      }
+      data: { email }
     });
     
     return NextResponse.json(
