@@ -23,8 +23,7 @@ function Navbar() {
   
   const navLinks = [
     { name: 'Features', href: '#features' },
-    { name: 'How It Works', href: '#how-it-works' },
-    { name: 'Testimonials', href: '#testimonials' },
+    { name: 'How It Works', href: '#how-it-works' }
   ];
   
   return (

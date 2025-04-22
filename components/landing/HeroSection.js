@@ -59,18 +59,6 @@ function HeroSection() {
             </div>
           </div>
         </div>
-        
-        {/* Trust Indicators */}
-        <div className="mt-16 text-center">
-          <p className="text-sm uppercase tracking-wider text-gray-500 mb-4">Trusted by educators from</p>
-          <div className="flex flex-wrap justify-center gap-8 opacity-70">
-            {['MIT', 'Stanford', 'Harvard', 'Berkeley', 'Oxford'].map((university) => (
-              <span key={university} className="text-lg font-semibold text-gray-700">
-                {university}
-              </span>
-            ))}
-          </div>
-        </div>
       </div>
     </section>
   );
