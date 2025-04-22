@@ -1,9 +1,14 @@
+// components/landing/HeroSection.jsx
 'use client';
 
 import Image from 'next/image';
+import { useState } from 'react';
 import WaitlistForm from '@/components/common/WaitlistForm';
+import DashboardHeroAnimation from '@/components/landing/DashboardHeroAnimation';
 
 function HeroSection() {
+  const [isFormVisible, setIsFormVisible] = useState(false);
+
   return (
     <section className="relative py-20 lg:py-32 overflow-hidden bg-gradient-to-br from-white to-blue-50">
       {/* Background decorative elements */}
@@ -25,20 +30,32 @@ function HeroSection() {
               Learn mathematics and programming through structured 120-hour courses with interactive exercises, comprehensive theory, and project-based learning.
             </p>
             
-            {/* Waitlist Form */}
-            <WaitlistForm className="max-w-lg mx-auto lg:mx-0" />
+            <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start mb-8">
+              <button 
+                onClick={() => setIsFormVisible(true)}
+                className="px-8 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-lg font-medium"
+              >
+                Join the Waitlist
+              </button>
+              <a 
+                href="#how-it-works" 
+                className="px-8 py-3 bg-white border border-blue-600 text-blue-600 rounded-md hover:bg-blue-50 transition-colors text-lg font-medium"
+              >
+                How It Works
+              </a>
+            </div>
+            
+            {isFormVisible && (
+              <div className="lg:max-w-md">
+                <WaitlistForm buttonText="Get Early Access" />
+              </div>
+            )}
           </div>
           
-          {/* Right side - Illustration */}
-          <div className="w-full lg:w-1/2">
-            <div className="relative h-96 sm:h-[450px] w-full">
-              <Image 
-                src="/api/placeholder/600/500"
-                alt="CourseLab Platform Illustration"
-                fill
-                className="object-contain"
-                priority
-              />
+          {/* Right side - Dashboard Animation */}
+          <div className="w-full lg:w-1/2 mt-6 lg:mt-0">
+            <div className="transform hover:scale-105 transition-transform duration-300">
+              <DashboardHeroAnimation />
             </div>
           </div>
         </div>

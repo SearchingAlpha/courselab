@@ -16,7 +16,7 @@ export default function LandingPage() {
   return (
     <main className="min-h-screen bg-white">
       <Navbar />
-      <HeroSection />
+      <HeroSection /> {/* The updated HeroSection with the dashboard animation */}
       <FeaturesSection />
       <HowItWorksSection />
       <TestimonialsSection />
