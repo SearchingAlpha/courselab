@@ -19,7 +19,6 @@ export default function LandingPage() {
       <HeroSection /> {/* The updated HeroSection with the dashboard animation */}
       <FeaturesSection />
       <HowItWorksSection />
-      <TestimonialsSection />
       <CtaSection />
       <Footer />
     </main>
