@@ -1,9 +1,9 @@
-// app/api/courses/[id]/syllabus/route.js
+// app/api/courses/[id]/project/route.js
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import prisma from '@/lib/prisma';
 import { authOptions } from '../../../auth/[...nextauth]/route';
-import { syllabusAgent } from '@/lib/ai-agents';
+import { projectAgent } from '@/lib/ai-agents';
 
 export async function POST(request, { params }) {
   try {
@@ -42,17 +42,37 @@ export async function POST(request, { params }) {
       );
     }
     
-    // Generate syllabus using AI
-    const syllabus = await syllabusAgent.generateSyllabus(course);
+    // In a production app, we would fetch the syllabus data from the database
+    // For now, we'll simulate modules data
     
-    // In a production app, save the syllabus to the database
+    // This is a placeholder - in a real app, you'd fetch this from the database
+    const modules = [
+      {
+        id: 1,
+        title: "Foundations and Prerequisites",
+        description: "Establishing core knowledge and prerequisites for the course"
+      },
+      {
+        id: 2,
+        title: "Core Concepts",
+        description: "Fundamental principles and key concepts of the subject"
+      },
+      // Additional modules would be fetched from the database
+    ];
+    
+    // Generate project using AI
+    const project = await projectAgent.generateProject(course, modules);
+    
+    // In a production app, save the project to the database
     // For now, we'll just return it
     
-    return NextResponse.json(syllabus);
+    return NextResponse.json({
+      project
+    });
   } catch (error) {
-    console.error('Error generating syllabus:', error);
+    console.error('Error generating project:', error);
     return NextResponse.json(
-      { message: 'Failed to generate syllabus. Please try again.' },
+      { message: 'Failed to generate project. Please try again.' },
       { status: 500 }
     );
   }
