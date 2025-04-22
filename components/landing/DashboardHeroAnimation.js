@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Home, BookOpen, Layout, LogOut, Menu, ChevronDown, Plus, Code, Clock, CheckCircle } from 'lucide-react';
+import { Home, BookOpen, Layout, LogOut, Menu, ChevronDown, Plus, Code, Clock, ChartBar } from 'lucide-react';
 
 const DashboardHeroAnimation = () => {
   const [activeScreen, setActiveScreen] = useState('dashboard');
@@ -26,6 +26,7 @@ const DashboardHeroAnimation = () => {
       { pos: { x: 100, y: 180 }, action: 'hover', screen: 'dashboard' },
       { pos: { x: 400, y: 240 }, action: 'click', screen: 'courseDetail' },
       { pos: { x: 100, y: 230 }, action: 'click', screen: 'courses' },
+      { pos: { x: 100, y: 340 }, action: 'click', screen: 'analysis' }, // Added Analysis tab click
       { pos: { x: 100, y: 285 }, action: 'click', screen: 'createCourse' },
       { pos: { x: 100, y: 180 }, action: 'click', screen: 'dashboard' }
     ];
@@ -82,6 +83,19 @@ const DashboardHeroAnimation = () => {
           <a className="flex items-center text-green-600 mt-2 text-xs">
             <Layout size={12} className="mr-1" />
             <span className="font-medium">Create new course</span>
+          </a>
+        </div>
+        
+        <div className="bg-white rounded-lg shadow-sm p-4 border border-purple-100">
+          <div className="flex justify-between items-start">
+            <h2 className="text-sm font-semibold text-gray-900">Analytics</h2>
+            <div className="bg-purple-100 text-purple-600 text-xs font-semibold rounded-full w-5 h-5 flex items-center justify-center">
+              <ChartBar size={10} />
+            </div>
+          </div>
+          <a className="flex items-center text-purple-600 mt-2 text-xs">
+            <Code size={12} className="mr-1" />
+            <span className="font-medium">View statistics</span>
           </a>
         </div>
       </div>
@@ -159,6 +173,70 @@ const DashboardHeroAnimation = () => {
             </div>
             <p className="text-xs text-gray-600 mt-1">Mathematical fundamentals and prerequisites</p>
           </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  // Analysis screen
+  const AnalysisScreen = () => (
+    <div className="space-y-4">
+      <h1 className="text-xl font-bold text-gray-900">Learning Analytics</h1>
+      <p className="text-sm text-gray-600">Track your progress and learning patterns</p>
+      
+      <div className="bg-white rounded-lg shadow-sm p-4">
+        <h2 className="text-sm font-semibold text-gray-900 mb-3">Study Time Distribution</h2>
+        <div className="h-32 flex items-end justify-between gap-2 mb-2">
+          {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day, i) => (
+            <div key={day} className="flex-1 flex flex-col items-center">
+              <div 
+                className="w-full bg-blue-500 rounded-t-sm"
+                style={{ height: `${Math.floor(Math.random() * 70) + 10}%` }}
+              ></div>
+              <span className="text-xs text-gray-600 mt-1">{day}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+      
+      <div className="grid grid-cols-2 gap-4">
+        <div className="bg-white rounded-lg shadow-sm p-4">
+          <h2 className="text-sm font-semibold text-gray-900 mb-2">Course Completion</h2>
+          <div className="flex justify-center my-3">
+            <div className="relative w-24 h-24">
+              <svg viewBox="0 0 36 36" className="w-full h-full">
+                <path
+                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                  fill="none"
+                  stroke="#eee"
+                  strokeWidth="3"
+                />
+                <path
+                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                  fill="none"
+                  stroke="#3b82f6"
+                  strokeWidth="3"
+                  strokeDasharray="75, 100"
+                />
+              </svg>
+              <div className="absolute inset-0 flex items-center justify-center text-lg font-semibold text-blue-600">
+                75%
+              </div>
+            </div>
+          </div>
+          <p className="text-xs text-center text-gray-600">Overall completion rate</p>
+        </div>
+        
+        <div className="bg-white rounded-lg shadow-sm p-4">
+          <h2 className="text-sm font-semibold text-gray-900 mb-2">Learning Streak</h2>
+          <div className="flex items-center justify-center gap-3 my-3">
+            <div className="text-3xl font-bold text-green-600">14</div>
+            <div className="text-xs text-gray-600">
+              <div>consecutive</div>
+              <div>days</div>
+            </div>
+          </div>
+          <p className="text-xs text-center text-gray-600">Keep up the momentum!</p>
         </div>
       </div>
     </div>
@@ -265,6 +343,8 @@ const DashboardHeroAnimation = () => {
         return <CourseDetailScreen />;
       case 'courses':
         return <CoursesScreen />;
+      case 'analysis':
+        return <AnalysisScreen />;
       case 'createCourse':
         return <CreateCourseScreen />;
       default:
@@ -273,29 +353,32 @@ const DashboardHeroAnimation = () => {
   };
 
   return (
-    <div className="relative max-w-3xl mx-auto bg-gray-800 rounded-lg overflow-hidden shadow-2xl border border-gray-700">
-      {/* Browser mockup */}
-      <div className="bg-gray-900 px-4 py-2 flex items-center">
+    <div className="relative mx-auto bg-gray-800 rounded-lg overflow-hidden shadow-2xl border border-gray-700 max-w-4xl">
+      {/* Mac-style browser mockup */}
+      <div className="bg-gradient-to-r from-gray-800 to-gray-900 px-4 py-3 flex items-center">
         <div className="flex space-x-2">
           <div className="w-3 h-3 rounded-full bg-red-500"></div>
           <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
           <div className="w-3 h-3 rounded-full bg-green-500"></div>
         </div>
         <div className="ml-4 flex-1 flex justify-center">
-          <div className="bg-gray-700 rounded px-3 py-1 text-gray-300 text-xs max-w-sm truncate">
-            courseforge.io/dashboard
+          <div className="bg-gray-700 rounded-full px-4 py-1 text-gray-300 text-xs w-80 truncate text-center">
+            CourseLab.io/dashboard
           </div>
         </div>
+        <div className="w-16"></div> {/* Spacer to balance the window controls */}
       </div>
       
       {/* App interface */}
-      <div className="bg-gray-100 h-96 flex overflow-hidden">
+      <div className="bg-gray-100 h-[500px] flex overflow-hidden">
+        {/* Content scaling container */}
+        <div className="absolute inset-0 flex overflow-hidden" style={{ transform: 'scale(0.8)', transformOrigin: 'top left', height: '125%', width: '125%' }}>
         {/* Sidebar */}
         <div className={`${
           isSidebarOpen ? 'w-48' : 'w-0'
         } bg-white border-r border-gray-200 transition-all duration-300 overflow-hidden`}>
           <div className="flex items-center justify-between px-4 py-3 border-b">
-            <div className="text-sm font-bold text-blue-600">CourseForge</div>
+            <div className="text-sm font-bold text-blue-600">CourseLab</div>
           </div>
           
           <div className="px-3 py-2">
@@ -337,6 +420,13 @@ const DashboardHeroAnimation = () => {
                 Create Course
               </a>
               
+              <a className={`flex items-center px-3 py-2 text-xs rounded-md transition ${
+                activeScreen === 'analysis' ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-50'
+              }`}>
+                <ChartBar size={14} className="mr-2" />
+                Analytics
+              </a>
+              
               <a className="flex items-center px-3 py-2 text-xs rounded-md text-gray-700 hover:bg-red-50 hover:text-red-700 transition">
                 <LogOut size={14} className="mr-2" />
                 Sign Out
@@ -372,17 +462,19 @@ const DashboardHeroAnimation = () => {
           </main>
         </div>
       </div>
+      </div>
       
-      {/* Animated cursor */}
+      {/* Animated cursor - replaced with an actual arrow cursor */}
       <div 
-        className="absolute pointer-events-none w-4 h-4 transform -translate-x-1/2 -translate-y-1/2 z-50 transition-all duration-500"
+        className="absolute pointer-events-none w-5 h-5 transform -translate-x-1/2 -translate-y-1/2 z-50 transition-all duration-500"
         style={{ 
-          left: cursorPosition.x, 
-          top: cursorPosition.y 
+          left: cursorPosition.x * 0.8, 
+          top: cursorPosition.y * 0.8 
         }}
       >
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M4 4L18 18M9 14L4 19" stroke="black" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20" fill="black">
+          <path d="M10.724,1.055 L4.328,15.692 C3.893,16.582 4.741,17.542 5.66,17.227 L9.133,15.911 L11.642,19.267 C12.123,19.93 13.112,19.93 13.594,19.267 L19.036,11.834 C19.518,11.172 19.157,10.258 18.325,10.029 L13.965,8.982 L15.472,4.435 C15.763,3.496 14.993,2.582 14.037,2.73 L10.724,1.055 Z" fill="white"/>
+          <path d="M4,2 L16,14 L10.5,14 L8,19 L4,2 Z" fill="black" stroke="white" strokeWidth="1"/>
         </svg>
         {clickEffect && (
           <div className="absolute top-0 left-0 w-8 h-8 bg-blue-500 rounded-full opacity-50 animate-ping"></div>
@@ -392,6 +484,9 @@ const DashboardHeroAnimation = () => {
       {/* Browser shine effect */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-lg">
         <div className="absolute top-0 left-0 w-full h-48 bg-gradient-to-br from-white opacity-5 transform -translate-y-24 skew-y-6"></div>
+        
+        {/* Mac-style window shadow */}
+        <div className="absolute inset-0 shadow-xl pointer-events-none"></div>
       </div>
     </div>
   );
