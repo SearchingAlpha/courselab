@@ -20,7 +20,7 @@ const testimonials = [
     name: 'Emily Rodriguez',
     role: 'Mathematics Professor',
     image: '/api/placeholder/80/80',
-    quote: 'I\'ve recommended CourseForge to all my students. The depth of material and interactive components create an unparalleled learning experience.',
+    quote: 'I\'ve recommended CourseLab to all my students. The depth of material and interactive components create an unparalleled learning experience.',
     rating: 5
   }
 ];
@@ -34,7 +34,7 @@ function TestimonialsSection() {
             What Our <span className="text-blue-600">Users Say</span>
           </h2>
           <p className="text-xl text-gray-700 max-w-3xl mx-auto">
-            Join thousands of learners who have transformed their skills with CourseForge.
+            Join thousands of learners who have transformed their skills with CourseLab.
           </p>
         </div>
         

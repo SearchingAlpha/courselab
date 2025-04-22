@@ -83,7 +83,7 @@ function Footer() {
         </div>
         
         <div className="border-t border-gray-800 mt-12 pt-8 text-center text-gray-500 text-sm">
-          <p>&copy; {currentYear} CourseForge. All rights reserved.</p>
+          <p>&copy; {currentYear} CourseLab. All rights reserved.</p>
         </div>
       </div>
     </footer>

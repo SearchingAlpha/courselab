@@ -50,7 +50,7 @@ function WaitlistForm({ buttonText = 'Join Waitlist', className = '' }) {
           </div>
           <div>
             <h3 className="font-medium text-green-800">Thank you for joining!</h3>
-            <p className="text-green-700 mt-1">We'll notify you when CourseForge is ready for you.</p>
+            <p className="text-green-700 mt-1">We&apos;ll notify you when CourseLab is ready for you.</p>
           </div>
         </div>
       ) : (

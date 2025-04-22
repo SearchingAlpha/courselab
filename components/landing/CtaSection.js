@@ -11,7 +11,7 @@ function CtaSection() {
             Ready to Transform Your Learning Experience?
           </h2>
           <p className="text-xl text-blue-100 mb-10 max-w-2xl mx-auto">
-            Join our waitlist today and be the first to experience the future of personalized education with CourseForge.
+            Join our waitlist today and be the first to experience the future of personalized education with CourseLab.
           </p>
           
           <WaitlistForm className="max-w-lg mx-auto" buttonText="Join Waitlist" />

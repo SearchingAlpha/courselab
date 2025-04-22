@@ -36,7 +36,7 @@ function Navbar() {
           {/* Logo */}
           <Link href="/" className="flex items-center">
             <span className={`text-2xl font-bold ${isScrolled ? 'text-blue-600' : 'text-blue-600'}`}>
-              CourseForge
+              CourseLab
             </span>
           </Link>
           

@@ -42,7 +42,7 @@ function FeaturesSection() {
             Learn How <span className="text-blue-600">You Want</span>
           </h2>
           <p className="text-xl text-gray-700 max-w-3xl mx-auto">
-            CourseForge combines comprehensive theory with hands-on practice to create the most effective learning experience.
+            CourseLab combines comprehensive theory with hands-on practice to create the most effective learning experience.
           </p>
         </div>
         

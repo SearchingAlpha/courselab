@@ -6,7 +6,7 @@ export default function HowItWorksSection() {
     <section id="how-it-works" className="py-20 bg-gradient-to-b from-white to-gray-50">
       <div className="container mx-auto px-4">
         <div className="text-center max-w-3xl mx-auto mb-16">
-          <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">How CourseForge Works</h2>
+          <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">How CourseLab Works</h2>
           <p className="text-lg text-gray-600">
             A simple, structured process to create your personalized learning journey from start to finish.
           </p>
@@ -29,7 +29,7 @@ export default function HowItWorksSection() {
           </div>
           <h3 className="text-2xl font-bold text-gray-900 mb-4">Ready to Transform Your Learning?</h3>
           <p className="text-gray-600 max-w-2xl mx-auto mb-8">
-            CourseForge is currently in development. Join our waitlist to be among the first to experience this revolutionary learning platform.
+            CourseLab is currently in development. Join our waitlist to be among the first to experience this revolutionary learning platform.
           </p>
           <a 
             href="#waitlist" 

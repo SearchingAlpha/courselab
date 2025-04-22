@@ -34,7 +34,7 @@ function HeroSection() {
             <div className="relative h-96 sm:h-[450px] w-full">
               <Image 
                 src="/api/placeholder/600/500"
-                alt="CourseForge Platform Illustration"
+                alt="CourseLab Platform Illustration"
                 fill
                 className="object-contain"
                 priority
