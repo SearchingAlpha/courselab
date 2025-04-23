@@ -59,8 +59,17 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
+model Syllabus {
+  id        String   @id @default(cuid())
+  content   String
+  courseId  String   @unique
+  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 model Course {
-  id             String   @id @default(cuid())
+  id             String    @id @default(cuid())
   title          String
   description    String?
   topic          String
@@ -68,8 +77,9 @@ model Course {
   knowledgeLevel String
   focus          String
   approach       String
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
   userId         String
-  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  syllabus       Syllabus?
 }

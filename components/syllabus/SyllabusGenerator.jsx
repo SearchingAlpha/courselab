@@ -1,68 +1,486 @@
 'use client';
 
-import { useState } from 'react';
-import { streamContent } from '@/lib/streaming';
+import { useState, useEffect, useMemo } from 'react';
+import { FiFileText, FiDownload, FiRefreshCw, FiCheck, FiSearch, FiClock, FiChevronDown, FiChevronRight, FiCalendar, FiActivity, FiBook, FiLayers } from 'react-icons/fi';
+import { motion, AnimatePresence } from 'framer-motion';
 
 export default function SyllabusGenerator({ courseId }) {
   const [content, setContent] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysis, setAnalysis] = useState('');
   const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+  const [expandedSections, setExpandedSections] = useState({});
+  const [activeTab, setActiveTab] = useState('content');
+
+  useEffect(() => {
+    fetchExistingSyllabus();
+  }, [courseId]);
+
+  const fetchExistingSyllabus = async () => {
+    try {
+      const response = await fetch(`/api/courses/${courseId}/syllabus`);
+      if (response.ok) {
+        const data = await response.json();
+        setContent(data.content);
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleGenerate = async () => {
     setIsGenerating(true);
     setError('');
-    setContent('');
+    const isRegenerating = content ? true : false;
+    setAnalysis('');
 
     try {
-      await streamContent(
-        `/api/courses/${courseId}/syllabus`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+      // If we already have content, we're regenerating
+      const url = isRegenerating 
+        ? `/api/courses/${courseId}/syllabus?regenerate=true` 
+        : `/api/courses/${courseId}/syllabus`;
+      
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
         },
-        (token) => {
-          setContent((prev) => prev + token);
-        },
-        () => {
-          setIsGenerating(false);
-        },
-        (error) => {
-          setError(error);
-          setIsGenerating(false);
-        }
-      );
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to generate syllabus');
+      }
+
+      const data = await response.json();
+      setContent(data.content);
+      // Reset expanded sections when new content is loaded
+      setExpandedSections({});
     } catch (err) {
       setError(err.message);
+    } finally {
       setIsGenerating(false);
     }
   };
 
-  return (
-    <div className="max-w-4xl mx-auto p-6">
-      <div className="flex justify-between items-center mb-8">
-        <h2 className="text-2xl font-bold text-gray-900">Course Syllabus</h2>
-        <button
-          onClick={handleGenerate}
-          disabled={isGenerating}
-          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
-        >
-          {isGenerating ? 'Generating...' : 'Generate Syllabus'}
-        </button>
+  const handleAnalyze = async () => {
+    setIsAnalyzing(true);
+    setError('');
+    setAnalysis('');
+
+    try {
+      const response = await fetch(`/api/courses/${courseId}/syllabus?analyze=true`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to analyze syllabus');
+      }
+
+      const data = await response.json();
+      setAnalysis(data.content);
+      setActiveTab('analysis');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const handleDownload = () => {
+    const blob = new Blob([content], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'syllabus.md';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  // Parse the content to extract sections for collapsible viewing
+  const parsedSections = useMemo(() => {
+    if (!content) return [];
+
+    const sections = [];
+    const lines = content.split('\n');
+    let currentSection = null;
+    let currentContent = [];
+    let moduleIndex = 0;
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      
+      // Parse module sections (## Course Structure)
+      if (line.startsWith('## Course Structure')) {
+        if (currentSection) {
+          sections.push({
+            ...currentSection,
+            content: currentContent.join('\n')
+          });
+        }
+        currentSection = { 
+          id: 'course-structure',
+          title: line.replace('##', '').trim(),
+          level: 2,
+          isModule: false,
+          icon: <FiLayers className="w-5 h-5" />
+        };
+        currentContent = [line];
+      }
+      // Parse module headers (### Module 1, etc)
+      else if (line.match(/^### Module \d+/)) {
+        if (currentSection) {
+          sections.push({
+            ...currentSection,
+            content: currentContent.join('\n')
+          });
+        }
+        moduleIndex++;
+        currentSection = { 
+          id: `module-${moduleIndex}`,
+          title: line.replace('###', '').trim(),
+          level: 3,
+          isModule: true,
+          // Extract time allocation if present
+          timeAllocation: line.includes('(') && line.includes(')') 
+            ? line.substring(line.indexOf('(') + 1, line.indexOf(')')) 
+            : null,
+          icon: <FiBook className="w-5 h-5" />
+        };
+        currentContent = [line];
+      }
+      // Parse other major sections
+      else if (line.startsWith('## ')) {
+        if (currentSection) {
+          sections.push({
+            ...currentSection,
+            content: currentContent.join('\n')
+          });
+        }
+        const sectionId = line.replace('##', '').trim().toLowerCase().replace(/\s+/g, '-');
+        let icon = <FiFileText className="w-5 h-5" />;
+        
+        if (line.includes('Learning Objectives')) icon = <FiActivity className="w-5 h-5" />;
+        else if (line.includes('Assessment')) icon = <FiSearch className="w-5 h-5" />;
+        else if (line.includes('Final Project')) icon = <FiLayers className="w-5 h-5" />;
+        else if (line.includes('Prerequisites')) icon = <FiCalendar className="w-5 h-5" />;
+        
+        currentSection = { 
+          id: sectionId,
+          title: line.replace('##', '').trim(),
+          level: 2,
+          isModule: false,
+          icon
+        };
+        currentContent = [line];
+      }
+      else {
+        currentContent.push(line);
+      }
+    }
+    
+    // Don't forget to add the last section
+    if (currentSection) {
+      sections.push({
+        ...currentSection,
+        content: currentContent.join('\n')
+      });
+    }
+    
+    return sections;
+  }, [content]);
+
+  const toggleSection = (id) => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [id]: !prev[id]
+    }));
+  };
+
+  // Extract the time allocations to calculate timeline
+  const timelineData = useMemo(() => {
+    return parsedSections.filter(section => section.isModule).map(module => ({
+      id: module.id,
+      title: module.title,
+      timeAllocation: module.timeAllocation || 'N/A',
+      // Extract hours as number for width calculation
+      hours: parseInt(module.timeAllocation?.match(/(\d+)\s*hours/) || [0, 10])[1]
+    }));
+  }, [parsedSections]);
+
+  // Total course hours for timeline calculation
+  const totalHours = useMemo(() => {
+    return timelineData.reduce((total, module) => total + module.hours, 0) || 120;
+  }, [timelineData]);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
       </div>
+    );
+  }
 
-      {error && (
-        <div className="mb-4 p-4 bg-red-100 text-red-700 rounded-md">
-          {error}
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="max-w-7xl mx-auto space-y-6"
+    >
+      <div className="bg-white rounded-lg shadow-lg overflow-hidden">
+        <div className="border-b border-gray-200 bg-gray-50 p-6">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center space-x-4">
+              <FiFileText className="w-6 h-6 text-blue-600" />
+              <h2 className="text-2xl font-bold text-gray-900 font-mono">Course Syllabus</h2>
+            </div>
+            <div className="flex space-x-4">
+              {content && (
+                <>
+                  <button
+                    onClick={handleAnalyze}
+                    disabled={isAnalyzing}
+                    className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                  >
+                    <FiSearch className="mr-2 -ml-1 h-5 w-5" />
+                    {isAnalyzing ? 'Analyzing...' : 'Analyze'}
+                  </button>
+                  <button
+                    onClick={handleDownload}
+                    className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                  >
+                    <FiDownload className="mr-2 -ml-1 h-5 w-5" />
+                    Download
+                  </button>
+                </>
+              )}
+              <button
+                onClick={handleGenerate}
+                disabled={isGenerating}
+                className={`inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white ${
+                  isGenerating
+                    ? 'bg-blue-400 cursor-not-allowed'
+                    : 'bg-blue-600 hover:bg-blue-700'
+                } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500`}
+              >
+                {isGenerating ? (
+                  <>
+                    <FiRefreshCw className="animate-spin mr-2 -ml-1 h-5 w-5" />
+                    Generating...
+                  </>
+                ) : content ? (
+                  <>
+                    <FiRefreshCw className="mr-2 -ml-1 h-5 w-5" />
+                    Regenerate
+                  </>
+                ) : (
+                  <>
+                    <FiCheck className="mr-2 -ml-1 h-5 w-5" />
+                    Generate
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
         </div>
-      )}
 
-      {content && (
-        <div className="prose max-w-none">
-          <div dangerouslySetInnerHTML={{ __html: content }} />
-        </div>
-      )}
-    </div>
+        {error && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="m-6 p-4 bg-red-50 border-l-4 border-red-400 text-red-700 rounded-md"
+          >
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <svg
+                  className="h-5 w-5 text-red-400"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm">{error}</p>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {content && (
+          <div className="p-6">
+            {/* Tabs */}
+            <div className="border-b border-gray-200 mb-6">
+              <nav className="-mb-px flex space-x-8">
+                <button
+                  onClick={() => setActiveTab('content')}
+                  className={`${
+                    activeTab === 'content'
+                      ? 'border-blue-500 text-blue-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  } whitespace-nowrap pb-4 px-1 border-b-2 font-medium text-sm font-mono`}
+                >
+                  Content
+                </button>
+                <button
+                  onClick={() => setActiveTab('timeline')}
+                  className={`${
+                    activeTab === 'timeline'
+                      ? 'border-blue-500 text-blue-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  } whitespace-nowrap pb-4 px-1 border-b-2 font-medium text-sm font-mono`}
+                >
+                  Timeline
+                </button>
+                {analysis && (
+                  <button
+                    onClick={() => setActiveTab('analysis')}
+                    className={`${
+                      activeTab === 'analysis'
+                        ? 'border-blue-500 text-blue-600'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    } whitespace-nowrap pb-4 px-1 border-b-2 font-medium text-sm font-mono`}
+                  >
+                    Analysis
+                  </button>
+                )}
+              </nav>
+            </div>
+
+            {/* Syllabus Content with Collapsible Sections */}
+            {activeTab === 'content' && (
+              <div className="space-y-6">
+                {parsedSections.length > 0 ? (
+                  parsedSections.map((section) => (
+                    <div 
+                      key={section.id} 
+                      className={`border rounded-md ${section.level === 2 ? 'border-gray-300 bg-gray-50' : 'border-gray-200'}`}
+                    >
+                      <button
+                        onClick={() => toggleSection(section.id)}
+                        className={`w-full flex justify-between items-center p-4 text-left ${section.level === 2 ? 'font-bold' : 'font-medium'}`}
+                      >
+                        <div className="flex items-center space-x-3">
+                          {section.icon}
+                          <span className="font-mono">
+                            {section.title}
+                            {section.timeAllocation && (
+                              <span className="ml-2 text-blue-600 text-sm">
+                                ({section.timeAllocation})
+                              </span>
+                            )}
+                          </span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          {section.isModule && (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                              <FiClock className="mr-1 h-3 w-3" />
+                              {section.timeAllocation || 'N/A'}
+                            </span>
+                          )}
+                          {expandedSections[section.id] ? (
+                            <FiChevronDown className="h-5 w-5 text-gray-500" />
+                          ) : (
+                            <FiChevronRight className="h-5 w-5 text-gray-500" />
+                          )}
+                        </div>
+                      </button>
+                      <AnimatePresence>
+                        {expandedSections[section.id] && (
+                          <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: 'auto', opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            transition={{ duration: 0.2 }}
+                            className="overflow-hidden"
+                          >
+                            <div className="border-t border-gray-200 p-4 prose prose-blue max-w-none font-mono text-sm">
+                              <div 
+                                dangerouslySetInnerHTML={{ 
+                                  __html: section.content
+                                    .replace(/^#+\s.*$/gm, '') // Remove section title since we're displaying it in the button
+                                    .replace(/^-\s(.*)$/gm, '<li>$1</li>') // Convert dashes to list items
+                                    .replace(/<li>.*<\/li>/gs, match => `<ul>${match}</ul>`) // Wrap list items in ul
+                                    .replace(/^\s*\n/gm, '') // Remove empty lines
+                                }} 
+                              />
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  ))
+                ) : (
+                  <div className="prose prose-blue max-w-none font-mono text-sm">
+                    <div dangerouslySetInnerHTML={{ __html: content }} />
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Timeline View */}
+            {activeTab === 'timeline' && (
+              <div className="space-y-6">
+                <div className="bg-gray-50 p-4 rounded-md border border-gray-200">
+                  <h3 className="text-lg font-bold mb-4 font-mono flex items-center">
+                    <FiClock className="mr-2" /> Course Timeline (Total: {totalHours} hours)
+                  </h3>
+                  <div className="space-y-4">
+                    {timelineData.map((module, index) => (
+                      <div key={module.id} className="relative">
+                        <div className="flex items-center mb-1">
+                          <span className="font-medium font-mono">{module.title}</span>
+                          <span className="ml-2 text-sm text-blue-600 font-mono">{module.timeAllocation}</span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-2.5 mb-4">
+                          <div 
+                            className="bg-blue-600 h-2.5 rounded-full" 
+                            style={{ width: `${(module.hours / totalHours) * 100}%` }}
+                          ></div>
+                        </div>
+                        {index < timelineData.length - 1 && (
+                          <div className="absolute h-4 border-l border-gray-300 left-0 -bottom-4"></div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Analysis View */}
+            {activeTab === 'analysis' && analysis && (
+              <div className="prose prose-blue max-w-none bg-blue-50 p-4 rounded-md border border-blue-200">
+                <div dangerouslySetInnerHTML={{ __html: analysis }} />
+              </div>
+            )}
+          </div>
+        )}
+
+        {!content && !isGenerating && !error && (
+          <div className="flex flex-col items-center justify-center min-h-[400px] text-gray-500 bg-gray-50">
+            <FiFileText className="w-12 h-12 mb-4" />
+            <p className="text-lg font-mono">No syllabus generated yet</p>
+            <p className="text-sm font-mono">Click the Generate button to create a syllabus</p>
+            <div className="mt-6 bg-black bg-opacity-5 p-4 rounded-md border border-gray-300 w-2/3 max-w-md font-mono text-sm">
+              <div className="flex items-center text-blue-600 mb-2">
+                <span className="mr-2">$</span> generate-syllabus
+              </div>
+              <div className="text-gray-600">// Generates a comprehensive course syllabus based on your course settings</div>
+            </div>
+          </div>
+        )}
+      </div>
+    </motion.div>
   );
 } 
