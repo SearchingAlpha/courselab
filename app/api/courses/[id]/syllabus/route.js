@@ -1,20 +1,28 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
-import { PrismaClient } from '@prisma/client';
-import { authOptions } from '../../../auth/[...nextauth]/route';
-import { createStreamingResponse } from '@/lib/streaming';
+import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import prisma from '@/lib/prisma';
+import { generateSyllabus, analyzeSyllabus } from '@/lib/agents/syllabusAgent';
 
-const prisma = new PrismaClient();
+export async function GET(req, { params }) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user) {
+    return new NextResponse('Unauthorized', { status: 401 });
+  }
 
-export async function POST(request, { params }) {
   try {
-    if (!params?.id) {
-      return NextResponse.json(
-        { message: 'Course ID is required' },
-        { status: 400 }
-      );
+    const resolvedParams = await params;
+    const syllabus = await prisma.syllabus.findUnique({
+      where: {
+        courseId: resolvedParams.id,
+      },
+    });
+
+    if (!syllabus) {
+      return new NextResponse('Syllabus not found', { status: 404 });
     }
 
+<<<<<<< HEAD
     const session = await getServerSession(authOptions);
     
 <<<<<<< HEAD
@@ -101,71 +109,85 @@ export async function GET(request, { params }) {
         { message: 'Unauthorized' },
         { status: 401 }
       );
+=======
+    // If analysis is requested, provide feedback on the syllabus
+    const searchParams = new URL(req.url).searchParams;
+    if (searchParams.get('analyze') === 'true') {
+      const analysis = await analyzeSyllabus(syllabus.content);
+      return NextResponse.json({ content: analysis });
+>>>>>>> 1e445c4 (commit: changes in syllabus creation - finished)
     }
 
-    // Fetch the course details
+    return NextResponse.json(syllabus);
+  } catch (error) {
+    console.error('Error fetching syllabus:', error);
+    return new NextResponse('Internal Server Error', { status: 500 });
+  }
+}
+
+export async function POST(req, { params }) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user) {
+    return new NextResponse('Unauthorized', { status: 401 });
+  }
+
+  try {
+    const resolvedParams = await params;
     const course = await prisma.course.findUnique({
-      where: { id: params.id },
+      where: {
+        id: resolvedParams.id,
+      },
+      include: {
+        syllabus: true,
+      },
     });
 
     if (!course) {
-      return NextResponse.json(
-        { message: 'Course not found' },
-        { status: 404 }
-      );
+      return new NextResponse('Course not found', { status: 404 });
     }
 
-    // Check if the user has access to this course
-    if (course.userId !== session.user.id) {
-      return NextResponse.json(
-        { message: 'Unauthorized' },
-        { status: 403 }
-      );
+    // If syllabus already exists, return it
+    if (course.syllabus) {
+      return NextResponse.json(course.syllabus);
     }
 
-    // Create the prompt for Claude
-    const prompt = `Create a comprehensive 120-hour syllabus for a course on ${course.topic}.
-    Course Details:
-    - Title: ${course.title}
-    - Topic: ${course.topic}
-    - Learning Goal: ${course.endGoal}
-    - Knowledge Level: ${course.knowledgeLevel}
-    - Focus: ${course.focus}
-    - Approach: ${course.approach}
+    // Generate new syllabus using the specialized agent
+    const content = await generateSyllabus(course);
 
-    The syllabus should:
-    1. Be divided into logical modules/chapters
-    2. Include estimated time for each section
-    3. Progress from basic to advanced concepts
-    4. Include both theoretical and practical components
-    5. End with a capstone project
-
-    Format the output in Markdown with clear headings and sections.`;
-
-    // Create streaming response with correct Claude API message format
-    return createStreamingResponse(request, {
-      model: "claude-3-opus-20240229",
-      messages: [
-        {
-          role: "assistant",
-          content: "I am an expert educational content creator. I will create a well-structured, comprehensive syllabus that follows best practices in curriculum design."
-        },
-        {
-          role: "user",
-          content: prompt
-        }
-      ],
-      max_tokens: 4000,
-      temperature: 0.7,
-      stream: true
+    // Create a new syllabus in the database
+    const syllabus = await prisma.syllabus.create({
+      data: {
+        content,
+        courseId: resolvedParams.id,
+      },
     });
 
+    return NextResponse.json(syllabus);
   } catch (error) {
     console.error('Error generating syllabus:', error);
+<<<<<<< HEAD
     return NextResponse.json(
       { message: 'Something went wrong. Please try again.' },
       { status: 500 }
     );
 >>>>>>> 369ef94 (commit: syllabus creation backend)
+=======
+    return new NextResponse('Internal Server Error', { status: 500 });
+>>>>>>> 1e445c4 (commit: changes in syllabus creation - finished)
   }
+}
+
+// Helper function to convert stream to string
+async function streamToString(stream) {
+  const reader = stream.getReader();
+  const decoder = new TextDecoder();
+  let result = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    result += decoder.decode(value);
+  }
+
+  return result;
 }
