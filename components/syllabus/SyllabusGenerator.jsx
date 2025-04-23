@@ -374,11 +374,6 @@ export default function SyllabusGenerator({ courseId }) {
                           {section.icon}
                           <span className="font-mono">
                             {section.title}
-                            {section.timeAllocation && (
-                              <span className="ml-2 text-blue-600 text-sm">
-                                ({section.timeAllocation})
-                              </span>
-                            )}
                           </span>
                         </div>
                         <div className="flex items-center space-x-2">
