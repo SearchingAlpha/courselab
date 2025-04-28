@@ -83,3 +83,10 @@ model Course {
   user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   syllabus       Syllabus?
 }
+
+model Waitlist {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
