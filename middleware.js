@@ -1,5 +1,15 @@
 import { NextResponse } from 'next/server';
-import { getToken } from 'next-auth/jwt';
+import { createClient } from '@supabase/supabase-js';
+
+// Initialize Supabase client
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error('Missing Supabase environment variables');
+}
+
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export async function middleware(request) {
   const path = request.nextUrl.pathname;
@@ -11,18 +21,14 @@ export async function middleware(request) {
                       path === '/auth/error' ||
                       path === '/auth/verify-request';
   
-  const token = await getToken({ 
-    req: request,
-    secret: process.env.NEXTAUTH_SECRET
-  });
+  // Get the session from cookies
+  const accessToken = request.cookies.get('sb-access-token')?.value;
   
-  // Redirect unauthenticated users to signin page if they're accessing protected routes
-  if (!token && !isPublicPath) {
+  if (!accessToken && !isPublicPath) {
     return NextResponse.redirect(new URL('/auth/signin', request.url));
   }
   
-  // Redirect authenticated users to dashboard if they try to access auth pages
-  if (token && (path === '/auth/signin' || path === '/auth/signup')) {
+  if (accessToken && (path === '/auth/signin' || path === '/auth/signup')) {
     return NextResponse.redirect(new URL('/dashboard', request.url));
   }
   

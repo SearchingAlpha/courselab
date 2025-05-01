@@ -1,24 +1,63 @@
 'use client';
 
-import { useState } from 'react';
-import { useSession, signOut } from 'next-auth/react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Menu, ChevronDown, Home, BookOpen, Code, BookType, Layout, LogOut } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 
 export default function DashboardLayout({ children }) {
-  const { data: session, status } = useSession();
   const router = useRouter();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
   
-  // If not authenticated, redirect to sign in
-  if (status === 'unauthenticated') {
-    router.push('/auth/signin');
-    return null;
-  }
+  useEffect(() => {
+    // Get the current user
+    const getUser = async () => {
+      try {
+        console.log('DashboardLayout: Getting user...');
+        const { data: { user } } = await supabase.auth.getUser();
+        console.log('DashboardLayout: User data:', user);
+        setUser(user);
+      } catch (error) {
+        console.error('DashboardLayout: Error getting user:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    getUser();
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      console.log('DashboardLayout: Auth state changed:', _event, session?.user);
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // Handle authentication redirect - only redirect if we're sure the user is not authenticated
+  useEffect(() => {
+    console.log('DashboardLayout: Auth check - loading:', loading, 'user:', user);
+    if (!loading && !user) {
+      console.log('DashboardLayout: No user found, redirecting to signin...');
+      // Add a small delay to ensure session cookies are properly set
+      const timer = setTimeout(() => {
+        // Check one more time before redirecting
+        supabase.auth.getUser().then(({ data: { user } }) => {
+          if (!user) {
+            router.push('/auth/signin');
+          }
+        });
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [loading, user, router]);
   
   // While loading session, show loading indicator
-  if (status === 'loading') {
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
@@ -26,8 +65,39 @@ export default function DashboardLayout({ children }) {
     );
   }
   
+  // If not authenticated, return null (will be handled by useEffect)
+  if (!user) {
+    return null;
+  }
+  
   const toggleSidebar = () => {
     setIsSidebarOpen(!isSidebarOpen);
+  };
+
+  const handleSignOut = async () => {
+    try {
+      // Clear user state first
+      setUser(null);
+      setLoading(true);
+
+      // Sign out from Supabase
+      const { error } = await supabase.auth.signOut();
+      
+      if (error) {
+        throw error;
+      }
+
+      // Clear any remaining cookies
+      document.cookie.split(";").forEach(function(c) { 
+        document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
+      });
+
+      // Force a hard reload to ensure all state is cleared
+      window.location.href = '/auth/signin';
+    } catch (error) {
+      console.error('Error signing out:', error);
+      setLoading(false);
+    }
   };
   
   return (
@@ -52,20 +122,20 @@ export default function DashboardLayout({ children }) {
           <div className="mb-6 mt-4">
             <div className="flex items-center px-2 py-3 rounded-md">
               <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-semibold">
-                {session?.user?.name?.charAt(0) || 'U'}
+                {user?.user_metadata?.name?.charAt(0) || 'U'}
               </div>
               <div className="ml-2">
                 <div className="text-sm font-medium text-gray-900 truncate">
-                  {session?.user?.name || 'User'}
+                  {user?.user_metadata?.name || 'User'}
                 </div>
                 <div className="text-xs text-gray-500 truncate">
-                  {session?.user?.email || ''}
+                  {user?.email || ''}
                 </div>
               </div>
             </div>
           </div>
           
-          <nav className="mt-4 space-y-1">
+          <nav className="space-y-1">
             <Link
               href="/dashboard"
               className="flex items-center px-4 py-3 text-gray-700 rounded-md hover:bg-blue-50 hover:text-blue-700 transition"
@@ -91,7 +161,7 @@ export default function DashboardLayout({ children }) {
             </Link>
             
             <button
-              onClick={() => signOut({ callbackUrl: '/' })}
+              onClick={handleSignOut}
               className="flex w-full items-center px-4 py-3 text-gray-700 rounded-md hover:bg-red-50 hover:text-red-700 transition"
             >
               <LogOut size={18} className="mr-3" />
@@ -121,7 +191,7 @@ export default function DashboardLayout({ children }) {
                   className="inline-flex items-center justify-center w-full rounded-md px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none"
                 >
                   <span className="mr-2">
-                    {session?.user?.name || 'User'}
+                    {user?.user_metadata?.name || 'User'}
                   </span>
                   <ChevronDown size={16} />
                 </button>

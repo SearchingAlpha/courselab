@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
@@ -18,21 +17,33 @@ export default function SignIn() {
     setError('');
 
     try {
-      const result = await signIn('credentials', {
-        redirect: false,
-        email,
-        password,
+      console.log('SignIn: Attempting to sign in...');
+      const response = await fetch('/api/auth/signin', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+        credentials: 'include',
       });
 
-      if (result?.error) {
-        setError('Invalid email or password');
-        setIsLoading(false);
-        return;
+      const data = await response.json();
+      console.log('SignIn: Response received:', data);
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to sign in');
       }
 
+      // Reset loading state before navigation
+      setIsLoading(false);
+      
+      console.log('SignIn: Successful sign in, redirecting to dashboard...');
+      // Use Next.js router for navigation
       router.push('/dashboard');
+      router.refresh(); // Force a refresh to ensure the session is updated
     } catch (error) {
-      setError('Something went wrong. Please try again.');
+      console.error('SignIn: Error during sign in:', error);
+      setError(error.message || 'Failed to sign in. Please try again.');
       setIsLoading(false);
     }
   };
@@ -60,7 +71,7 @@ export default function SignIn() {
           </div>
         )}
         
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} className="mt-8 space-y-6">
           <div className="rounded-md shadow-sm -space-y-px">
             <div>
               <label htmlFor="email-address" className="sr-only">
@@ -104,37 +115,6 @@ export default function SignIn() {
             >
               {isLoading ? 'Signing in...' : 'Sign in'}
             </button>
-          </div>
-          
-          <div className="mt-6">
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-300"></div>
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-gray-50 text-gray-500">Or continue with</span>
-              </div>
-            </div>
-
-            <div className="mt-6 grid grid-cols-2 gap-3">
-              <div>
-                <button
-                  onClick={() => signIn('github', { callbackUrl: '/dashboard' })}
-                  className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
-                >
-                  <span>GitHub</span>
-                </button>
-              </div>
-
-              <div>
-                <button
-                  onClick={() => signIn('google', { callbackUrl: '/dashboard' })}
-                  className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
-                >
-                  <span>Google</span>
-                </button>
-              </div>
-            </div>
           </div>
         </form>
       </div>

@@ -1,6 +1,6 @@
 1. **Project Structure & Authentication**
     - Create authentication system (NextAuth setup)
-    - Define database schema with Prisma
+    - Define database schema with Supabase
     - Create dashboard layout structure
 
 2. **Course Creation Flow**

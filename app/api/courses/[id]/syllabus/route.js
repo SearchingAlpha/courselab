@@ -57,3 +57,34 @@
 //     );
 //   }
 // }
+
+import { supabase } from '@/lib/supabase'
+
+export async function GET(request, { params }) {
+  try {
+    const { data: course, error: courseError } = await supabase
+      .from('courses')
+      .select('*')
+      .eq('id', params.id)
+      .single()
+
+    if (courseError) throw courseError
+
+    // TODO: Implement syllabus generation logic
+    const syllabus = []
+
+    return new Response(JSON.stringify(syllabus), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  } catch (error) {
+    console.error('Error generating syllabus:', error)
+    return new Response(JSON.stringify({ 
+      error: 'Failed to generate syllabus',
+      details: error.message 
+    }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  }
+}

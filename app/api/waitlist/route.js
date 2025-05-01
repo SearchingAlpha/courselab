@@ -1,5 +1,5 @@
 // app/api/waitlist/route.js
-import { addToWaitlist } from '@/lib/db'
+import { supabase } from '@/lib/supabase'
 
 export async function POST(request) {
   try {
@@ -12,15 +12,47 @@ export async function POST(request) {
       })
     }
 
-    const result = await addToWaitlist(email)
+    // First check if email already exists
+    const { data: existingEntry, error: checkError } = await supabase
+      .from('waitlist')
+      .select('id')
+      .eq('email', email)
+      .single()
 
-    return new Response(JSON.stringify(result), {
-      status: 200,
+    if (checkError && checkError.code !== 'PGRST116') { // PGRST116 is "not found" error
+      console.error('Error checking existing email:', checkError)
+      throw checkError
+    }
+
+    if (existingEntry) {
+      return new Response(JSON.stringify({ message: 'Email already exists in waitlist' }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    }
+
+    // Insert new entry
+    const { data, error } = await supabase
+      .from('waitlist')
+      .insert([{ email }])
+      .select()
+      .single()
+
+    if (error) {
+      console.error('Error inserting into waitlist:', error)
+      throw error
+    }
+
+    return new Response(JSON.stringify(data), {
+      status: 201,
       headers: { 'Content-Type': 'application/json' },
     })
   } catch (error) {
-    console.error('Error adding to waitlist:', error)
-    return new Response(JSON.stringify({ error: 'Failed to add to waitlist' }), {
+    console.error('Error in waitlist POST:', error)
+    return new Response(JSON.stringify({ 
+      error: 'Failed to add to waitlist',
+      details: error.message 
+    }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },
     })
