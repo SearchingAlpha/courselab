@@ -4,6 +4,10 @@ import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import prisma from '@/lib/prisma';
 import { generateSyllabus, analyzeSyllabus } from '@/lib/agents/syllabusAgent';
 
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+>>>>>>> 8854001d8b75e99d16789558a1ab26e252e9287a
 export async function GET(req, { params }) {
   const session = await getServerSession(authOptions);
   if (!session?.user) {
@@ -23,7 +27,85 @@ export async function GET(req, { params }) {
     }
 
 <<<<<<< HEAD
+<<<<<<< HEAD
     const session = await getServerSession(authOptions);
+=======
+    // If analysis is requested, provide feedback on the syllabus
+    const searchParams = new URL(req.url).searchParams;
+    if (searchParams.get('analyze') === 'true') {
+      const analysis = await analyzeSyllabus(syllabus.content);
+      return NextResponse.json({ content: analysis });
+    }
+
+    return NextResponse.json(syllabus);
+  } catch (error) {
+    console.error('Error fetching syllabus:', error);
+    return new NextResponse('Internal Server Error', { status: 500 });
+  }
+}
+
+export async function POST(req, { params }) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user) {
+    return new NextResponse('Unauthorized', { status: 401 });
+  }
+
+  try {
+    const resolvedParams = await params;
+    const course = await prisma.course.findUnique({
+      where: {
+        id: resolvedParams.id,
+      },
+      include: {
+        syllabus: true,
+      },
+    });
+
+    if (!course) {
+      return new NextResponse('Course not found', { status: 404 });
+    }
+
+    // If syllabus already exists, return it
+    if (course.syllabus) {
+      return NextResponse.json(course.syllabus);
+    }
+
+    // Generate new syllabus using the specialized agent
+    const content = await generateSyllabus(course);
+
+    // Create a new syllabus in the database
+    const syllabus = await prisma.syllabus.create({
+      data: {
+        content,
+        courseId: resolvedParams.id,
+      },
+    });
+
+    return NextResponse.json(syllabus);
+  } catch (error) {
+    console.error('Error generating syllabus:', error);
+    return new NextResponse('Internal Server Error', { status: 500 });
+  }
+}
+
+// Helper function to convert stream to string
+async function streamToString(stream) {
+  const reader = stream.getReader();
+  const decoder = new TextDecoder();
+  let result = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    result += decoder.decode(value);
+  }
+
+  return result;
+=======
+// export async function POST(request, { params }) {
+//   try {
+//     const { id } = params;
+>>>>>>> 8854001d8b75e99d16789558a1ab26e252e9287a
     
 <<<<<<< HEAD
 //     // Get the authenticated user's session
@@ -123,6 +205,7 @@ export async function GET(request, { params }) {
     console.error('Error fetching syllabus:', error);
     return new NextResponse('Internal Server Error', { status: 500 });
   }
+<<<<<<< HEAD
 }
 
 export async function POST(req, { params }) {
@@ -190,4 +273,7 @@ async function streamToString(stream) {
   }
 
   return result;
+=======
+>>>>>>> master
+>>>>>>> 8854001d8b75e99d16789558a1ab26e252e9287a
 }
