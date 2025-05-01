@@ -1,46 +1,28 @@
 // app/api/waitlist/route.js
-import { NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+import { addToWaitlist } from '@/lib/db'
 
 export async function POST(request) {
   try {
-    const { email } = await request.json();
-    
-    if (!email || !email.includes('@')) {
-      return NextResponse.json(
-        { success: false, message: 'Valid email is required' },
-        { status: 400 }
-      );
+    const { email } = await request.json()
+
+    if (!email) {
+      return new Response(JSON.stringify({ error: 'Email is required' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      })
     }
-    
-    // Check if email already exists
-    const existingUser = await prisma.waitlist.findUnique({
-      where: { email }
-    });
-    
-    if (existingUser) {
-      return NextResponse.json(
-        { success: true, message: 'You\'re already on our waitlist!' },
-        { status: 200 }
-      );
-    }
-    
-    // Add email to waitlist
-    await prisma.waitlist.create({
-      data: { email }
-    });
-    
-    return NextResponse.json(
-      { success: true, message: 'Successfully joined the waitlist!' },
-      { status: 201 }
-    );
-    
+
+    const result = await addToWaitlist(email)
+
+    return new Response(JSON.stringify(result), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    })
   } catch (error) {
-    console.error('Waitlist submission error:', error);
-    
-    return NextResponse.json(
-      { success: false, message: 'An error occurred. Please try again.' },
-      { status: 500 }
-    );
+    console.error('Error adding to waitlist:', error)
+    return new Response(JSON.stringify({ error: 'Failed to add to waitlist' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    })
   }
 }
