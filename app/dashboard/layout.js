@@ -1,24 +1,67 @@
 'use client';
 
-import { useState } from 'react';
-import { useSession, signOut } from 'next-auth/react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Menu, ChevronDown, Home, BookOpen, Code, BookType, Layout, LogOut } from 'lucide-react';
+import { getUser, signOut, debugAuthStore } from '@/lib/auth';
 
 export default function DashboardLayout({ children }) {
-  const { data: session, status } = useSession();
   const router = useRouter();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [authChecked, setAuthChecked] = useState(false);
   
-  // If not authenticated, redirect to sign in
-  if (status === 'unauthenticated') {
-    router.push('/auth/signin');
-    return null;
+  // Only run this once on component mount
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        console.log("Dashboard: Checking user authentication...");
+        debugAuthStore(); // Debug auth store
+        
+        // Get the user data
+        const currentUser = await getUser();
+        console.log("Dashboard: User check result:", currentUser);
+        
+        if (!currentUser) {
+          console.log("Dashboard: No user found, redirecting to signin...");
+          // Just show loading state. Don't trigger a redirect during render
+          setUser(null);
+        } else {
+          console.log("Dashboard: User authenticated:", currentUser.email);
+          setUser(currentUser);
+        }
+      } catch (error) {
+        console.error('Dashboard: Auth check error:', error);
+        setUser(null);
+      } finally {
+        setLoading(false);
+        setAuthChecked(true);
+      }
+    };
+
+    checkAuth();
+  }, []);
+  
+  // Separate effect to handle redirects
+  useEffect(() => {
+    if (authChecked && !user && !loading) {
+      console.log("Dashboard: Auth checked, no user, redirecting to signin...");
+      window.location.href = '/auth/signin';
+    }
+  }, [authChecked, user, loading]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
+      </div>
+    );
   }
-  
-  // While loading session, show loading indicator
-  if (status === 'loading') {
+
+  // Don't redirect here - we'll handle that in the effect above
+  if (!user) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
@@ -28,6 +71,16 @@ export default function DashboardLayout({ children }) {
   
   const toggleSidebar = () => {
     setIsSidebarOpen(!isSidebarOpen);
+  };
+
+  const handleSignOut = async () => {
+    try {
+      console.log("Dashboard: Signing out user...");
+      await signOut(true); // Will handle redirect internally
+    } catch (error) {
+      console.error('Dashboard: Error signing out:', error);
+      window.location.href = '/auth/signin';
+    }
   };
   
   return (
@@ -52,20 +105,20 @@ export default function DashboardLayout({ children }) {
           <div className="mb-6 mt-4">
             <div className="flex items-center px-2 py-3 rounded-md">
               <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-semibold">
-                {session?.user?.name?.charAt(0) || 'U'}
+                {user?.user_metadata?.name?.charAt(0) || 'U'}
               </div>
               <div className="ml-2">
                 <div className="text-sm font-medium text-gray-900 truncate">
-                  {session?.user?.name || 'User'}
+                  {user?.user_metadata?.name || 'User'}
                 </div>
                 <div className="text-xs text-gray-500 truncate">
-                  {session?.user?.email || ''}
+                  {user?.email || ''}
                 </div>
               </div>
             </div>
           </div>
           
-          <nav className="mt-4 space-y-1">
+          <nav className="space-y-1">
             <Link
               href="/dashboard"
               className="flex items-center px-4 py-3 text-gray-700 rounded-md hover:bg-blue-50 hover:text-blue-700 transition"
@@ -91,7 +144,7 @@ export default function DashboardLayout({ children }) {
             </Link>
             
             <button
-              onClick={() => signOut({ callbackUrl: '/' })}
+              onClick={handleSignOut}
               className="flex w-full items-center px-4 py-3 text-gray-700 rounded-md hover:bg-red-50 hover:text-red-700 transition"
             >
               <LogOut size={18} className="mr-3" />
@@ -121,7 +174,7 @@ export default function DashboardLayout({ children }) {
                   className="inline-flex items-center justify-center w-full rounded-md px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none"
                 >
                   <span className="mr-2">
-                    {session?.user?.name || 'User'}
+                    {user?.user_metadata?.name || 'User'}
                   </span>
                   <ChevronDown size={16} />
                 </button>

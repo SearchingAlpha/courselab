@@ -1,159 +1,69 @@
-import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth/next';
-import { PrismaClient } from '@prisma/client';
-import { authOptions } from '../../auth/[...nextauth]/route';
-
-const prisma = new PrismaClient();
+import { supabase } from '@/lib/supabase'
 
 export async function GET(request, { params }) {
   try {
-    const { id } = params;
-    
-    // Get the authenticated user's session
-    const session = await getServerSession(authOptions);
-    
-    if (!session?.user) {
-      return NextResponse.json(
-        { message: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-    
-    // Fetch the course
-    const course = await prisma.course.findUnique({
-      where: {
-        id,
-      },
-    });
-    
-    // Check if course exists
-    if (!course) {
-      return NextResponse.json(
-        { message: 'Course not found' },
-        { status: 404 }
-      );
-    }
-    
-    // Check if the user has access to this course
-    if (course.userId !== session.user.id) {
-      return NextResponse.json(
-        { message: 'Unauthorized' },
-        { status: 403 }
-      );
-    }
-    
-    return NextResponse.json(course);
+    const { data, error } = await supabase
+      .from('courses')
+      .select('*')
+      .eq('id', params.id)
+      .single()
+
+    if (error) throw error
+
+    return new Response(JSON.stringify(data), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    })
   } catch (error) {
-    console.error('Error fetching course:', error);
-    return NextResponse.json(
-      { message: 'Something went wrong. Please try again.' },
-      { status: 500 }
-    );
+    console.error('Error fetching course:', error)
+    return new Response(JSON.stringify({ error: 'Failed to fetch course' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    })
   }
 }
 
-export async function PATCH(request, { params }) {
+export async function PUT(request, { params }) {
   try {
-    const { id } = params;
-    const session = await getServerSession(authOptions);
-    
-    if (!session?.user) {
-      return NextResponse.json(
-        { message: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-    
-    // Get request body
-    const updates = await request.json();
-    
-    // Fetch the course to check ownership
-    const course = await prisma.course.findUnique({
-      where: {
-        id,
-      },
-    });
-    
-    if (!course) {
-      return NextResponse.json(
-        { message: 'Course not found' },
-        { status: 404 }
-      );
-    }
-    
-    // Check if the user has access to update this course
-    if (course.userId !== session.user.id) {
-      return NextResponse.json(
-        { message: 'Unauthorized' },
-        { status: 403 }
-      );
-    }
-    
-    // Update the course
-    const updatedCourse = await prisma.course.update({
-      where: {
-        id,
-      },
-      data: updates,
-    });
-    
-    return NextResponse.json(updatedCourse);
+    const courseData = await request.json()
+
+    const { data, error } = await supabase
+      .from('courses')
+      .update(courseData)
+      .eq('id', params.id)
+      .select()
+      .single()
+
+    if (error) throw error
+
+    return new Response(JSON.stringify(data), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    })
   } catch (error) {
-    console.error('Error updating course:', error);
-    return NextResponse.json(
-      { message: 'Something went wrong. Please try again.' },
-      { status: 500 }
-    );
+    console.error('Error updating course:', error)
+    return new Response(JSON.stringify({ error: 'Failed to update course' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    })
   }
 }
 
 export async function DELETE(request, { params }) {
   try {
-    const { id } = params;
-    const session = await getServerSession(authOptions);
-    
-    if (!session?.user) {
-      return NextResponse.json(
-        { message: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-    
-    // Fetch the course to check ownership
-    const course = await prisma.course.findUnique({
-      where: {
-        id,
-      },
-    });
-    
-    if (!course) {
-      return NextResponse.json(
-        { message: 'Course not found' },
-        { status: 404 }
-      );
-    }
-    
-    // Check if the user has access to delete this course
-    if (course.userId !== session.user.id) {
-      return NextResponse.json(
-        { message: 'Unauthorized' },
-        { status: 403 }
-      );
-    }
-    
-    // Delete the course
-    await prisma.course.delete({
-      where: {
-        id,
-      },
-    });
-    
-    return NextResponse.json({ message: 'Course deleted successfully' });
+    const { error } = await supabase
+      .from('courses')
+      .delete()
+      .eq('id', params.id)
+
+    if (error) throw error
+
+    return new Response(null, { status: 204 })
   } catch (error) {
-    console.error('Error deleting course:', error);
-    return NextResponse.json(
-      { message: 'Something went wrong. Please try again.' },
-      { status: 500 }
-    );
+    console.error('Error deleting course:', error)
+    return new Response(JSON.stringify({ error: 'Failed to delete course' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    })
   }
 }

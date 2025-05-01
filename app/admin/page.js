@@ -1,54 +1,42 @@
 // app/admin/page.js
-import prisma from '@/lib/prisma';
+import { supabase } from '@/lib/supabase'
 
 export const dynamic = 'force-dynamic'; // This ensures fresh data on each load
 
-async function getWaitlistEntries() {
-  return await prisma.waitlist.findMany({
-    orderBy: {
-      signupDate: 'desc',
-    },
-  });
-}
-
 export default async function AdminPage() {
-  const entries = await getWaitlistEntries();
-  
+  const { data: waitlist, error } = await supabase
+    .from('waitlist')
+    .select('*')
+    .order('created_at', { ascending: false })
+
+  if (error) {
+    console.error('Error fetching waitlist:', error)
+    return <div>Error loading waitlist</div>
+  }
+
   return (
-    <div className="container mx-auto py-10 px-4">
-      <h1 className="text-3xl font-bold mb-6">Waitlist Entries</h1>
-      
-      <div className="bg-white shadow rounded-lg overflow-hidden">
-        <table className="min-w-full divide-y divide-gray-200">
+    <div className="container mx-auto px-4 py-8">
+      <h1 className="text-2xl font-bold mb-6">Waitlist</h1>
+      <div className="bg-white shadow-md rounded-lg overflow-hidden">
+        <table className="min-w-full">
           <thead className="bg-gray-50">
             <tr>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Signup Date</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Joined</th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {entries.map((entry) => (
+            {waitlist.map((entry) => (
               <tr key={entry.id}>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{entry.email}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{entry.email}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {new Date(entry.signupDate).toLocaleString()}
+                  {new Date(entry.created_at).toLocaleDateString()}
                 </td>
               </tr>
             ))}
-            {entries.length === 0 && (
-              <tr>
-                <td colSpan="2" className="px-6 py-4 text-center text-sm text-gray-500">
-                  No waitlist entries yet.
-                </td>
-              </tr>
-            )}
           </tbody>
         </table>
       </div>
-      
-      <div className="mt-4 text-sm text-gray-500">
-        Total entries: {entries.length}
-      </div>
     </div>
-  );
+  )
 }

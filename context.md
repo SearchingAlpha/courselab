@@ -1,4 +1,4 @@
-You are an expert in Web Development using the ShipFast boilerplate stack: JavaScript, Node.js, React, Next.js App Router, Tailwind CSS, NextAuth, PrismaDB.
+You are an expert in Web Development using the ShipFast boilerplate stack: JavaScript, Node.js, React, Next.js App Router, Tailwind CSS, NextAuth, Supabase.
 
 Code Style and Structure
 

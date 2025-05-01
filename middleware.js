@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { getToken } from 'next-auth/jwt';
 
 export async function middleware(request) {
   const path = request.nextUrl.pathname;
@@ -11,21 +10,21 @@ export async function middleware(request) {
                       path === '/auth/error' ||
                       path === '/auth/verify-request';
   
-  const token = await getToken({ 
-    req: request,
-    secret: process.env.NEXTAUTH_SECRET
-  });
+  // For auth routes, just proceed (auth checks are handled client-side)
+  if (isPublicPath) {
+    return NextResponse.next();
+  }
   
-  // Redirect unauthenticated users to signin page if they're accessing protected routes
-  if (!token && !isPublicPath) {
+  // For dashboard and other protected routes, check for auth cookie
+  const authStateCookie = request.cookies.get('sb-auth-state')?.value;
+  const accessToken = request.cookies.get('sb-access-token')?.value;
+  
+  // If no auth cookie, redirect to sign in page
+  if (!authStateCookie && !accessToken) {
     return NextResponse.redirect(new URL('/auth/signin', request.url));
   }
   
-  // Redirect authenticated users to dashboard if they try to access auth pages
-  if (token && (path === '/auth/signin' || path === '/auth/signup')) {
-    return NextResponse.redirect(new URL('/dashboard', request.url));
-  }
-  
+  // Otherwise, let the request through
   return NextResponse.next();
 }
 

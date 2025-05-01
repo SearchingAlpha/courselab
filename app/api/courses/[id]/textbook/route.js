@@ -85,3 +85,34 @@
 //     );
 //   }
 // }
+
+import { supabase } from '@/lib/supabase'
+
+export async function GET(request, { params }) {
+  try {
+    const { data: course, error: courseError } = await supabase
+      .from('courses')
+      .select('*')
+      .eq('id', params.id)
+      .single()
+
+    if (courseError) throw courseError
+
+    // TODO: Implement textbook generation logic
+    const textbook = []
+
+    return new Response(JSON.stringify(textbook), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  } catch (error) {
+    console.error('Error generating textbook:', error)
+    return new Response(JSON.stringify({ 
+      error: 'Failed to generate textbook',
+      details: error.message 
+    }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  }
+}

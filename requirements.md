@@ -8,7 +8,7 @@ This document outlines the requirements for developing an automated course creat
 
 - **Frontend**: Next.js 14+ (App Router), React, Tailwind CSS, DaisyUI
 - **Backend**: Next.js API Routes, Node.js
-- **Database**: PostgreSQL with Prisma ORM
+- **Database**: PostgreSQL with Supabase
 - **Authentication**: NextAuth.js
 - **AI Integration**: LLM API integration (Claude/GPT)
 - **Code Standards**: Functional programming patterns, React Server Components where possible

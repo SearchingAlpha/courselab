@@ -1,16 +1,48 @@
 'use client';
 
-import { useState } from 'react';
-import { signIn } from 'next-auth/react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { supabase, getSession, signIn, debugAuthStore } from '@/lib/auth';
 
 export default function SignIn() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [authChecked, setAuthChecked] = useState(false);
+
+  // Check if user is already authenticated on page load
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        console.log('SignIn: Checking auth state...');
+        debugAuthStore();
+        
+        // Clear any malformed data
+        if (typeof window !== 'undefined') {
+          // Check for auth session
+          const session = await getSession();
+          
+          if (session) {
+            console.log('SignIn: Valid session found, redirecting to dashboard');
+            window.location.href = '/dashboard';
+            return;
+          }
+        }
+
+        console.log('SignIn: No valid session found, showing login form');
+      } catch (error) {
+        console.error('SignIn: Error checking auth status:', error);
+      } finally {
+        setIsLoading(false);
+        setAuthChecked(true);
+      }
+    };
+    
+    checkAuth();
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -18,24 +50,32 @@ export default function SignIn() {
     setError('');
 
     try {
-      const result = await signIn('credentials', {
-        redirect: false,
-        email,
-        password,
-      });
-
-      if (result?.error) {
-        setError('Invalid email or password');
-        setIsLoading(false);
-        return;
+      console.log('SignIn: Attempting to sign in...');
+      // Use our direct signIn function
+      const result = await signIn(email, password);
+      
+      if (!result || !result.user) {
+        throw new Error('Failed to sign in');
       }
 
-      router.push('/dashboard');
+      console.log('SignIn: Successful sign in, redirecting to dashboard...');
+      
+      // Use hard navigation for a clean reload with the new session
+      window.location.href = '/dashboard';
     } catch (error) {
-      setError('Something went wrong. Please try again.');
+      console.error('SignIn: Error during sign in:', error);
+      setError(error.message || 'Failed to sign in. Please try again.');
       setIsLoading(false);
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
@@ -60,7 +100,7 @@ export default function SignIn() {
           </div>
         )}
         
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} className="mt-8 space-y-6">
           <div className="rounded-md shadow-sm -space-y-px">
             <div>
               <label htmlFor="email-address" className="sr-only">
@@ -104,37 +144,6 @@ export default function SignIn() {
             >
               {isLoading ? 'Signing in...' : 'Sign in'}
             </button>
-          </div>
-          
-          <div className="mt-6">
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-300"></div>
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-gray-50 text-gray-500">Or continue with</span>
-              </div>
-            </div>
-
-            <div className="mt-6 grid grid-cols-2 gap-3">
-              <div>
-                <button
-                  onClick={() => signIn('github', { callbackUrl: '/dashboard' })}
-                  className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
-                >
-                  <span>GitHub</span>
-                </button>
-              </div>
-
-              <div>
-                <button
-                  onClick={() => signIn('google', { callbackUrl: '/dashboard' })}
-                  className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
-                >
-                  <span>Google</span>
-                </button>
-              </div>
-            </div>
           </div>
         </form>
       </div>

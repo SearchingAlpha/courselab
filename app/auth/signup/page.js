@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { signIn } from 'next-auth/react';
 
 export default function SignUp() {
   const router = useRouter();
@@ -24,36 +23,18 @@ export default function SignUp() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          name,
-          email,
-          password,
-        }),
+        body: JSON.stringify({ name, email, password }),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.message || 'Something went wrong');
+        throw new Error(data.error || 'Failed to sign up');
       }
 
-      // Sign in the user after successful registration
-      const result = await signIn('credentials', {
-        redirect: false,
-        email,
-        password,
-      });
-
-      if (result?.error) {
-        setError('Registration successful, but unable to sign in automatically. Please sign in manually.');
-        setIsLoading(false);
-        router.push('/auth/signin');
-        return;
-      }
-
-      router.push('/dashboard');
+      router.push('/auth/verify-request');
     } catch (error) {
-      setError(error.message || 'Something went wrong. Please try again.');
+      setError(error.message);
       setIsLoading(false);
     }
   };
@@ -81,7 +62,7 @@ export default function SignUp() {
           </div>
         )}
         
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} className="mt-8 space-y-6">
           <div className="rounded-md shadow-sm -space-y-px">
             <div>
               <label htmlFor="name" className="sr-only">
@@ -141,39 +122,6 @@ export default function SignUp() {
             >
               {isLoading ? 'Creating account...' : 'Sign up'}
             </button>
-          </div>
-          
-          <div className="mt-6">
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-300"></div>
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-gray-50 text-gray-500">Or continue with</span>
-              </div>
-            </div>
-
-            <div className="mt-6 grid grid-cols-2 gap-3">
-              <div>
-                <button
-                  type="button"
-                  onClick={() => signIn('github', { callbackUrl: '/dashboard' })}
-                  className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
-                >
-                  <span>GitHub</span>
-                </button>
-              </div>
-
-              <div>
-                <button
-                  type="button"
-                  onClick={() => signIn('google', { callbackUrl: '/dashboard' })}
-                  className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
-                >
-                  <span>Google</span>
-                </button>
-              </div>
-            </div>
           </div>
         </form>
       </div>

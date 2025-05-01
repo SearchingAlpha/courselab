@@ -1,46 +1,60 @@
 // app/api/waitlist/route.js
-import { NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+import { supabase } from '@/lib/supabase'
 
 export async function POST(request) {
   try {
-    const { email } = await request.json();
-    
-    if (!email || !email.includes('@')) {
-      return NextResponse.json(
-        { success: false, message: 'Valid email is required' },
-        { status: 400 }
-      );
+    const { email } = await request.json()
+
+    if (!email) {
+      return new Response(JSON.stringify({ error: 'Email is required' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      })
     }
-    
-    // Check if email already exists
-    const existingUser = await prisma.waitlist.findUnique({
-      where: { email }
-    });
-    
-    if (existingUser) {
-      return NextResponse.json(
-        { success: true, message: 'You\'re already on our waitlist!' },
-        { status: 200 }
-      );
+
+    // First check if email already exists
+    const { data: existingEntry, error: checkError } = await supabase
+      .from('waitlist')
+      .select('id')
+      .eq('email', email)
+      .single()
+
+    if (checkError && checkError.code !== 'PGRST116') { // PGRST116 is "not found" error
+      console.error('Error checking existing email:', checkError)
+      throw checkError
     }
-    
-    // Add email to waitlist
-    await prisma.waitlist.create({
-      data: { email }
-    });
-    
-    return NextResponse.json(
-      { success: true, message: 'Successfully joined the waitlist!' },
-      { status: 201 }
-    );
-    
+
+    if (existingEntry) {
+      return new Response(JSON.stringify({ message: 'Email already exists in waitlist' }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    }
+
+    // Insert new entry
+    const { data, error } = await supabase
+      .from('waitlist')
+      .insert([{ email }])
+      .select()
+      .single()
+
+    if (error) {
+      console.error('Error inserting into waitlist:', error)
+      throw error
+    }
+
+    return new Response(JSON.stringify(data), {
+      status: 201,
+      headers: { 'Content-Type': 'application/json' },
+    })
   } catch (error) {
-    console.error('Waitlist submission error:', error);
-    
-    return NextResponse.json(
-      { success: false, message: 'An error occurred. Please try again.' },
-      { status: 500 }
-    );
+    console.error('Error in waitlist POST:', error)
+    return new Response(JSON.stringify({ 
+      error: 'Failed to add to waitlist',
+      details: error.message 
+    }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    })
   }
 }

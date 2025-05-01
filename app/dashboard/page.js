@@ -1,11 +1,36 @@
 'use client';
 
-import { useSession } from 'next-auth/react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { BookOpen, Code, Plus, Layout, Clock } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 
 export default function Dashboard() {
-  const { data: session } = useSession();
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  
+  useEffect(() => {
+    // Get the current user
+    const getUser = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        setUser(user);
+      } catch (error) {
+        console.error('Error getting user:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    getUser();
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
   
   // Sample placeholder data - would be replaced with actual data from API
   const recentCourses = [
@@ -23,11 +48,19 @@ export default function Dashboard() {
     },
   ];
   
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+  
   return (
     <div className="space-y-6">
       <div className="bg-white rounded-lg shadow-sm p-6">
         <h1 className="text-2xl font-bold text-gray-900 mb-2">
-          Welcome back, {session?.user?.name?.split(' ')[0] || 'User'}
+          Welcome back, {user?.user_metadata?.name?.split(' ')[0] || 'User'}
         </h1>
         <p className="text-gray-600">
           Continue learning or create a new course to master complex topics.
