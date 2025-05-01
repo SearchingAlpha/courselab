@@ -1,15 +1,4 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-// Initialize Supabase client
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Missing Supabase environment variables');
-}
-
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export async function middleware(request) {
   const path = request.nextUrl.pathname;
@@ -21,17 +10,21 @@ export async function middleware(request) {
                       path === '/auth/error' ||
                       path === '/auth/verify-request';
   
-  // Get the session from cookies
+  // For auth routes, just proceed (auth checks are handled client-side)
+  if (isPublicPath) {
+    return NextResponse.next();
+  }
+  
+  // For dashboard and other protected routes, check for auth cookie
+  const authStateCookie = request.cookies.get('sb-auth-state')?.value;
   const accessToken = request.cookies.get('sb-access-token')?.value;
   
-  if (!accessToken && !isPublicPath) {
+  // If no auth cookie, redirect to sign in page
+  if (!authStateCookie && !accessToken) {
     return NextResponse.redirect(new URL('/auth/signin', request.url));
   }
   
-  if (accessToken && (path === '/auth/signin' || path === '/auth/signup')) {
-    return NextResponse.redirect(new URL('/dashboard', request.url));
-  }
-  
+  // Otherwise, let the request through
   return NextResponse.next();
 }
 

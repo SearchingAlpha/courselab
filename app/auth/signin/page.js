@@ -1,15 +1,48 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { supabase, getSession, signIn, debugAuthStore } from '@/lib/auth';
 
 export default function SignIn() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [authChecked, setAuthChecked] = useState(false);
+
+  // Check if user is already authenticated on page load
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        console.log('SignIn: Checking auth state...');
+        debugAuthStore();
+        
+        // Clear any malformed data
+        if (typeof window !== 'undefined') {
+          // Check for auth session
+          const session = await getSession();
+          
+          if (session) {
+            console.log('SignIn: Valid session found, redirecting to dashboard');
+            window.location.href = '/dashboard';
+            return;
+          }
+        }
+
+        console.log('SignIn: No valid session found, showing login form');
+      } catch (error) {
+        console.error('SignIn: Error checking auth status:', error);
+      } finally {
+        setIsLoading(false);
+        setAuthChecked(true);
+      }
+    };
+    
+    checkAuth();
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -18,35 +51,31 @@ export default function SignIn() {
 
     try {
       console.log('SignIn: Attempting to sign in...');
-      const response = await fetch('/api/auth/signin', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password }),
-        credentials: 'include',
-      });
-
-      const data = await response.json();
-      console.log('SignIn: Response received:', data);
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to sign in');
+      // Use our direct signIn function
+      const result = await signIn(email, password);
+      
+      if (!result || !result.user) {
+        throw new Error('Failed to sign in');
       }
 
-      // Reset loading state before navigation
-      setIsLoading(false);
-      
       console.log('SignIn: Successful sign in, redirecting to dashboard...');
-      // Use Next.js router for navigation
-      router.push('/dashboard');
-      router.refresh(); // Force a refresh to ensure the session is updated
+      
+      // Use hard navigation for a clean reload with the new session
+      window.location.href = '/dashboard';
     } catch (error) {
       console.error('SignIn: Error during sign in:', error);
       setError(error.message || 'Failed to sign in. Please try again.');
       setIsLoading(false);
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">

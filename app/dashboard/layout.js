@@ -4,59 +4,54 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Menu, ChevronDown, Home, BookOpen, Code, BookType, Layout, LogOut } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
+import { getUser, signOut, debugAuthStore } from '@/lib/auth';
 
 export default function DashboardLayout({ children }) {
   const router = useRouter();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [authChecked, setAuthChecked] = useState(false);
   
+  // Only run this once on component mount
   useEffect(() => {
-    // Get the current user
-    const getUser = async () => {
+    const checkAuth = async () => {
       try {
-        console.log('DashboardLayout: Getting user...');
-        const { data: { user } } = await supabase.auth.getUser();
-        console.log('DashboardLayout: User data:', user);
-        setUser(user);
+        console.log("Dashboard: Checking user authentication...");
+        debugAuthStore(); // Debug auth store
+        
+        // Get the user data
+        const currentUser = await getUser();
+        console.log("Dashboard: User check result:", currentUser);
+        
+        if (!currentUser) {
+          console.log("Dashboard: No user found, redirecting to signin...");
+          // Just show loading state. Don't trigger a redirect during render
+          setUser(null);
+        } else {
+          console.log("Dashboard: User authenticated:", currentUser.email);
+          setUser(currentUser);
+        }
       } catch (error) {
-        console.error('DashboardLayout: Error getting user:', error);
+        console.error('Dashboard: Auth check error:', error);
+        setUser(null);
       } finally {
         setLoading(false);
+        setAuthChecked(true);
       }
     };
 
-    getUser();
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      console.log('DashboardLayout: Auth state changed:', _event, session?.user);
-      setUser(session?.user ?? null);
-    });
-
-    return () => subscription.unsubscribe();
+    checkAuth();
   }, []);
-
-  // Handle authentication redirect - only redirect if we're sure the user is not authenticated
-  useEffect(() => {
-    console.log('DashboardLayout: Auth check - loading:', loading, 'user:', user);
-    if (!loading && !user) {
-      console.log('DashboardLayout: No user found, redirecting to signin...');
-      // Add a small delay to ensure session cookies are properly set
-      const timer = setTimeout(() => {
-        // Check one more time before redirecting
-        supabase.auth.getUser().then(({ data: { user } }) => {
-          if (!user) {
-            router.push('/auth/signin');
-          }
-        });
-      }, 100);
-      return () => clearTimeout(timer);
-    }
-  }, [loading, user, router]);
   
-  // While loading session, show loading indicator
+  // Separate effect to handle redirects
+  useEffect(() => {
+    if (authChecked && !user && !loading) {
+      console.log("Dashboard: Auth checked, no user, redirecting to signin...");
+      window.location.href = '/auth/signin';
+    }
+  }, [authChecked, user, loading]);
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -64,10 +59,14 @@ export default function DashboardLayout({ children }) {
       </div>
     );
   }
-  
-  // If not authenticated, return null (will be handled by useEffect)
+
+  // Don't redirect here - we'll handle that in the effect above
   if (!user) {
-    return null;
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
+      </div>
+    );
   }
   
   const toggleSidebar = () => {
@@ -76,27 +75,11 @@ export default function DashboardLayout({ children }) {
 
   const handleSignOut = async () => {
     try {
-      // Clear user state first
-      setUser(null);
-      setLoading(true);
-
-      // Sign out from Supabase
-      const { error } = await supabase.auth.signOut();
-      
-      if (error) {
-        throw error;
-      }
-
-      // Clear any remaining cookies
-      document.cookie.split(";").forEach(function(c) { 
-        document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
-      });
-
-      // Force a hard reload to ensure all state is cleared
-      window.location.href = '/auth/signin';
+      console.log("Dashboard: Signing out user...");
+      await signOut(true); // Will handle redirect internally
     } catch (error) {
-      console.error('Error signing out:', error);
-      setLoading(false);
+      console.error('Dashboard: Error signing out:', error);
+      window.location.href = '/auth/signin';
     }
   };
   

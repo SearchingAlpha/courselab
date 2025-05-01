@@ -1,12 +1,21 @@
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/lib/auth';
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 
 export async function POST(request) {
   try {
     const { email, password } = await request.json();
     console.log('API: Sign in attempt for:', email);
 
+    // Try to sign out any existing session first to ensure clean state
+    try {
+      await supabase.auth.signOut({ scope: 'local' });
+      console.log('API: Cleared any existing session before signing in');
+    } catch (error) {
+      console.log('API: No existing session to clear or error clearing:', error.message);
+      // Continue with sign in regardless of any error here
+    }
+
+    // Attempt to sign in with the provided credentials
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
@@ -25,29 +34,32 @@ export async function POST(request) {
     console.log('API: User authenticated successfully:', data.user.id);
 
     // Get the session
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    const session = data.session;
     
-    if (sessionError) {
-      console.error('API: Session error:', sessionError);
-      return NextResponse.json({ error: sessionError.message }, { status: 400 });
-    }
-
     if (!session) {
       console.error('API: No session created');
       return NextResponse.json({ error: 'No session created' }, { status: 400 });
     }
 
     console.log('API: Session created successfully, setting cookies');
-    // Set the session cookie
-    const response = NextResponse.json({ user: data.user });
     
-    // Set the auth cookie
+    // Create response object
+    const response = NextResponse.json({ 
+      user: data.user, 
+      success: true,
+      session: {
+        access_token: session.access_token,
+        expires_at: session.expires_at
+      }
+    });
+    
+    // Set the auth cookies with proper settings
     response.cookies.set({
       name: 'sb-access-token',
       value: session.access_token,
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      sameSite: 'lax',
       path: '/',
       maxAge: 60 * 60 * 24 * 7, // 1 week
     });
@@ -57,7 +69,18 @@ export async function POST(request) {
       value: session.refresh_token,
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 60 * 60 * 24 * 7, // 1 week
+    });
+
+    // Also set a non-HttpOnly cookie for client-side session check
+    response.cookies.set({
+      name: 'sb-auth-state',
+      value: 'true',
+      httpOnly: false,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
       path: '/',
       maxAge: 60 * 60 * 24 * 7, // 1 week
     });
