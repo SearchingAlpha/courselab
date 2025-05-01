@@ -1,35 +1,29 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
-import prisma from '@/lib/prisma';
+import { supabase } from '@/lib/auth';
 import { generateSyllabus, analyzeSyllabus } from '@/lib/agents/syllabusAgent';
 
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
->>>>>>> 8854001d8b75e99d16789558a1ab26e252e9287a
 export async function GET(req, { params }) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) {
-    return new NextResponse('Unauthorized', { status: 401 });
-  }
-
   try {
-    const resolvedParams = await params;
-    const syllabus = await prisma.syllabus.findUnique({
-      where: {
-        courseId: resolvedParams.id,
-      },
-    });
+    // Authenticate using Supabase
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) {
+      return new NextResponse('Unauthorized', { status: 401 });
+    }
 
-    if (!syllabus) {
+    const resolvedParams = await params;
+    
+    // Fetch syllabus using Supabase
+    const { data: syllabus, error } = await supabase
+      .from('syllabus')
+      .select('*')
+      .eq('course_id', resolvedParams.id)
+      .single();
+
+    if (error) {
+      console.error('Error fetching syllabus:', error);
       return new NextResponse('Syllabus not found', { status: 404 });
     }
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-    const session = await getServerSession(authOptions);
-=======
     // If analysis is requested, provide feedback on the syllabus
     const searchParams = new URL(req.url).searchParams;
     if (searchParams.get('analyze') === 'true') {
@@ -45,218 +39,81 @@ export async function GET(req, { params }) {
 }
 
 export async function POST(req, { params }) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) {
-    return new NextResponse('Unauthorized', { status: 401 });
-  }
-
   try {
+    // Authenticate using Supabase
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) {
+      return new NextResponse('Unauthorized', { status: 401 });
+    }
+
     const resolvedParams = await params;
-    const course = await prisma.course.findUnique({
-      where: {
-        id: resolvedParams.id,
-      },
-      include: {
-        syllabus: true,
-      },
-    });
-
-    if (!course) {
-      return new NextResponse('Course not found', { status: 404 });
-    }
-
-    // If syllabus already exists, return it
-    if (course.syllabus) {
-      return NextResponse.json(course.syllabus);
-    }
-
-    // Generate new syllabus using the specialized agent
-    const content = await generateSyllabus(course);
-
-    // Create a new syllabus in the database
-    const syllabus = await prisma.syllabus.create({
-      data: {
-        content,
-        courseId: resolvedParams.id,
-      },
-    });
-
-    return NextResponse.json(syllabus);
-  } catch (error) {
-    console.error('Error generating syllabus:', error);
-    return new NextResponse('Internal Server Error', { status: 500 });
-  }
-}
-
-// Helper function to convert stream to string
-async function streamToString(stream) {
-  const reader = stream.getReader();
-  const decoder = new TextDecoder();
-  let result = '';
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    result += decoder.decode(value);
-  }
-
-  return result;
-=======
-// export async function POST(request, { params }) {
-//   try {
-//     const { id } = params;
->>>>>>> 8854001d8b75e99d16789558a1ab26e252e9287a
     
-<<<<<<< HEAD
-//     // Get the authenticated user's session
-//     const session = await getServerSession(authOptions);
-    
-//     if (!session?.user) {
-//       return NextResponse.json(
-//         { message: 'Unauthorized' },
-//         { status: 401 }
-//       );
-//     }
-    
-//     // Fetch the course
-//     const course = await prisma.course.findUnique({
-//       where: {
-//         id,
-//       },
-//     });
-    
-//     // Check if course exists
-//     if (!course) {
-//       return NextResponse.json(
-//         { message: 'Course not found' },
-//         { status: 404 }
-//       );
-//     }
-    
-//     // Check if the user has access to this course
-//     if (course.userId !== session.user.id) {
-//       return NextResponse.json(
-//         { message: 'Unauthorized' },
-//         { status: 403 }
-//       );
-//     }
-    
-//     // Generate syllabus using AI
-//     const syllabus = await syllabusAgent.generateSyllabus(course);
-    
-//     // In a production app, save the syllabus to the database
-//     // For now, we'll just return it
-    
-//     return NextResponse.json(syllabus);
-//   } catch (error) {
-//     console.error('Error generating syllabus:', error);
-//     return NextResponse.json(
-//       { message: 'Failed to generate syllabus. Please try again.' },
-//       { status: 500 }
-//     );
-//   }
-// }
-
-import { supabase } from '@/lib/supabase'
-
-export async function GET(request, { params }) {
-  try {
+    // Check if course exists
     const { data: course, error: courseError } = await supabase
       .from('courses')
       .select('*')
-      .eq('id', params.id)
-      .single()
+      .eq('id', resolvedParams.id)
+      .single();
 
-    if (courseError) throw courseError
-
-    // TODO: Implement syllabus generation logic
-    const syllabus = []
-
-    return new Response(JSON.stringify(syllabus), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    })
-  } catch (error) {
-    console.error('Error generating syllabus:', error)
-    return new Response(JSON.stringify({ 
-      error: 'Failed to generate syllabus',
-      details: error.message 
-    }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    })
-=======
-    if (!session?.user) {
-      return NextResponse.json(
-        { message: 'Unauthorized' },
-        { status: 401 }
-      );
-=======
-    // If analysis is requested, provide feedback on the syllabus
-    const searchParams = new URL(req.url).searchParams;
-    if (searchParams.get('analyze') === 'true') {
-      const analysis = await analyzeSyllabus(syllabus.content);
-      return NextResponse.json({ content: analysis });
->>>>>>> 1e445c4 (commit: changes in syllabus creation - finished)
-    }
-
-    return NextResponse.json(syllabus);
-  } catch (error) {
-    console.error('Error fetching syllabus:', error);
-    return new NextResponse('Internal Server Error', { status: 500 });
-  }
-<<<<<<< HEAD
-}
-
-export async function POST(req, { params }) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) {
-    return new NextResponse('Unauthorized', { status: 401 });
-  }
-
-  try {
-    const resolvedParams = await params;
-    const course = await prisma.course.findUnique({
-      where: {
-        id: resolvedParams.id,
-      },
-      include: {
-        syllabus: true,
-      },
-    });
-
-    if (!course) {
+    if (courseError) {
+      console.error('Error fetching course:', courseError);
       return new NextResponse('Course not found', { status: 404 });
     }
 
-    // If syllabus already exists, return it
-    if (course.syllabus) {
-      return NextResponse.json(course.syllabus);
+    // Check if syllabus already exists
+    const { data: existingSyllabus, error: syllabusError } = await supabase
+      .from('syllabus')
+      .select('*')
+      .eq('course_id', resolvedParams.id)
+      .single();
+
+    // If syllabus exists and we're not regenerating, return it
+    const searchParams = new URL(req.url).searchParams;
+    const regenerate = searchParams.get('regenerate') === 'true';
+    
+    if (existingSyllabus && !regenerate) {
+      return NextResponse.json(existingSyllabus);
     }
 
     // Generate new syllabus using the specialized agent
     const content = await generateSyllabus(course);
 
-    // Create a new syllabus in the database
-    const syllabus = await prisma.syllabus.create({
-      data: {
-        content,
-        courseId: resolvedParams.id,
-      },
-    });
+    if (existingSyllabus) {
+      // Update existing syllabus
+      const { data: updatedSyllabus, error: updateError } = await supabase
+        .from('syllabus')
+        .update({ content })
+        .eq('id', existingSyllabus.id)
+        .select()
+        .single();
 
-    return NextResponse.json(syllabus);
+      if (updateError) {
+        console.error('Error updating syllabus:', updateError);
+        return new NextResponse('Failed to update syllabus', { status: 500 });
+      }
+
+      return NextResponse.json(updatedSyllabus);
+    } else {
+      // Create a new syllabus
+      const { data: newSyllabus, error: createError } = await supabase
+        .from('syllabus')
+        .insert([{
+          content,
+          course_id: resolvedParams.id
+        }])
+        .select()
+        .single();
+
+      if (createError) {
+        console.error('Error creating syllabus:', createError);
+        return new NextResponse('Failed to create syllabus', { status: 500 });
+      }
+
+      return NextResponse.json(newSyllabus);
+    }
   } catch (error) {
     console.error('Error generating syllabus:', error);
-<<<<<<< HEAD
-    return NextResponse.json(
-      { message: 'Something went wrong. Please try again.' },
-      { status: 500 }
-    );
->>>>>>> 369ef94 (commit: syllabus creation backend)
-=======
     return new NextResponse('Internal Server Error', { status: 500 });
->>>>>>> 1e445c4 (commit: changes in syllabus creation - finished)
   }
 }
 
@@ -273,7 +130,4 @@ async function streamToString(stream) {
   }
 
   return result;
-=======
->>>>>>> master
->>>>>>> 8854001d8b75e99d16789558a1ab26e252e9287a
 }

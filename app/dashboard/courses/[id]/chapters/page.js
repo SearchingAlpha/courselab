@@ -115,16 +115,16 @@ export default function ChaptersPage() {
         
         <div className="flex flex-wrap gap-2">
           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-            {course.knowledgeLevel}
+            {course.knowledge_level}
           </span>
           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
             {course.focus === 'math-heavy' && 'Math-focused'}
             {course.focus === 'balanced' && 'Balanced'}
-            {course.focus === 'code-heavy' && 'Code-focused'}
+            {course.focus === 'practical' && 'Practical'}
           </span>
           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-            {course.approach === 'theory' && 'Theory-focused'}
-            {course.approach === 'practice' && 'Practice-focused'}
+            {course.approach === 'visual' && 'Visual'}
+            {course.approach === 'text' && 'Text-based'}
             {course.approach === 'both' && 'Balanced approach'}
           </span>
         </div>

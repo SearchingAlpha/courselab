@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { BookOpen, Code, Plus, Layout, Clock } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
+import { supabase, getUser } from '@/lib/auth';
 
 export default function Dashboard() {
   const [user, setUser] = useState(null);
@@ -11,10 +11,10 @@ export default function Dashboard() {
   
   useEffect(() => {
     // Get the current user
-    const getUser = async () => {
+    const getUserData = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        setUser(user);
+        const userData = await getUser();
+        setUser(userData);
       } catch (error) {
         console.error('Error getting user:', error);
       } finally {
@@ -22,7 +22,7 @@ export default function Dashboard() {
       }
     };
 
-    getUser();
+    getUserData();
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {

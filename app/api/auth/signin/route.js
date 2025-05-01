@@ -1,4 +1,5 @@
-import { supabase } from '@/lib/auth';
+import { supabase as authSupabase } from '@/lib/auth';
+import { supabase } from '@/lib/supabase';
 import { NextResponse } from 'next/server';
 
 export async function POST(request) {
@@ -8,7 +9,7 @@ export async function POST(request) {
 
     // Try to sign out any existing session first to ensure clean state
     try {
-      await supabase.auth.signOut({ scope: 'local' });
+      await authSupabase.auth.signOut({ scope: 'local' });
       console.log('API: Cleared any existing session before signing in');
     } catch (error) {
       console.log('API: No existing session to clear or error clearing:', error.message);
@@ -16,7 +17,7 @@ export async function POST(request) {
     }
 
     // Attempt to sign in with the provided credentials
-    const { data, error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await authSupabase.auth.signInWithPassword({
       email,
       password,
     });
@@ -84,6 +85,35 @@ export async function POST(request) {
       path: '/',
       maxAge: 60 * 60 * 24 * 7, // 1 week
     });
+
+    // After successful sign-in, ensure user exists in the database
+    const authUser = data.user;
+    
+    // Check if user already exists in database
+    const { data: existingUser, error: lookupError } = await supabase
+      .from('users')
+      .select('id')
+      .eq('id', authUser.id)
+      .single();
+    
+    // If user doesn't exist, create them
+    if (!existingUser) {
+      console.log('User authenticated but not found in database, creating record:', authUser.id);
+      
+      const { error: insertError } = await supabase
+        .from('users')
+        .insert([{
+          id: authUser.id, // Use the same ID from auth
+          email: authUser.email,
+          name: authUser.user_metadata?.name || authUser.email?.split('@')[0] || 'User',
+          email_verified: authUser.email_confirmed_at
+        }]);
+      
+      if (insertError) {
+        console.error('Error creating user in database:', insertError);
+        // Continue anyway, as auth was successful
+      }
+    }
 
     console.log('API: Sign in process completed successfully');
     return response;

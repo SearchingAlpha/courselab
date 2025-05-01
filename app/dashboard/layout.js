@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Menu, ChevronDown, Home, BookOpen, Code, BookType, Layout, LogOut } from 'lucide-react';
-import { getUser, signOut, debugAuthStore } from '@/lib/auth';
+import { getUser, signOut, debugAuthStore, getSession, supabase } from '@/lib/auth';
 
 export default function DashboardLayout({ children }) {
   const router = useRouter();
@@ -20,17 +20,26 @@ export default function DashboardLayout({ children }) {
         console.log("Dashboard: Checking user authentication...");
         debugAuthStore(); // Debug auth store
         
-        // Get the user data
-        const currentUser = await getUser();
-        console.log("Dashboard: User check result:", currentUser);
+        // First try direct session check using the auth library
+        const session = await getSession();
+        if (session?.user) {
+          console.log("Dashboard: User found in session:", session.user.id);
+          setUser(session.user);
+          setLoading(false);
+          setAuthChecked(true);
+          return;
+        }
         
-        if (!currentUser) {
-          console.log("Dashboard: No user found, redirecting to signin...");
-          // Just show loading state. Don't trigger a redirect during render
-          setUser(null);
-        } else {
-          console.log("Dashboard: User authenticated:", currentUser.email);
+        // Then try the auth library getUser function
+        const currentUser = await getUser();
+        console.log("Dashboard: Auth library user check result:", currentUser);
+        
+        if (currentUser) {
+          console.log("Dashboard: User authenticated via auth library:", currentUser.email);
           setUser(currentUser);
+        } else {
+          console.log("Dashboard: No user found via auth library");
+          setUser(null);
         }
       } catch (error) {
         console.error('Dashboard: Auth check error:', error);
@@ -44,13 +53,24 @@ export default function DashboardLayout({ children }) {
     checkAuth();
   }, []);
   
-  // Separate effect to handle redirects
+  // Separate effect to handle redirects - with delay to avoid infinite loops
   useEffect(() => {
+    let redirectTimer;
+    
     if (authChecked && !user && !loading) {
-      console.log("Dashboard: Auth checked, no user, redirecting to signin...");
-      window.location.href = '/auth/signin';
+      console.log("Dashboard: Auth checked, no user, preparing to redirect...");
+      
+      // Set a small delay to avoid immediate redirect that could cause loops
+      redirectTimer = setTimeout(() => {
+        console.log("Dashboard: Redirecting to signin after delay");
+        router.push('/auth/signin');
+      }, 500);
     }
-  }, [authChecked, user, loading]);
+    
+    return () => {
+      if (redirectTimer) clearTimeout(redirectTimer);
+    };
+  }, [authChecked, user, loading, router]);
 
   if (loading) {
     return (
@@ -60,11 +80,20 @@ export default function DashboardLayout({ children }) {
     );
   }
 
-  // Don't redirect here - we'll handle that in the effect above
+  // Show a friendly message instead of a spinner when not authenticated
   if (!user) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
+        <div className="max-w-md mx-auto p-6 bg-white rounded-lg shadow-md text-center">
+          <h1 className="text-xl font-bold mb-4">Authentication Required</h1>
+          <p className="mb-6">You need to be signed in to access the dashboard.</p>
+          <button
+            onClick={() => router.push('/auth/signin')}
+            className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
+          >
+            Sign In
+          </button>
+        </div>
       </div>
     );
   }
@@ -79,7 +108,7 @@ export default function DashboardLayout({ children }) {
       await signOut(true); // Will handle redirect internally
     } catch (error) {
       console.error('Dashboard: Error signing out:', error);
-      window.location.href = '/auth/signin';
+      router.push('/auth/signin');
     }
   };
   

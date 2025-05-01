@@ -1,39 +1,22 @@
-import { supabase } from '@/lib/supabase'
+import { supabase } from '@/lib/auth'
 
-export async function POST(request) {
-  try {
-    const courseData = await request.json()
-
-    const { data, error } = await supabase
-      .from('courses')
-      .insert([courseData])
-      .select()
-      .single()
-
-    if (error) throw error
-
-    return new Response(JSON.stringify(data), {
-      status: 201,
-      headers: { 'Content-Type': 'application/json' },
-    })
-  } catch (error) {
-    console.error('Error creating course:', error)
-    return new Response(JSON.stringify({ error: 'Failed to create course' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    })
-  }
-}
-
+/**
+ * GET handler for listing courses
+ * Can be filtered by userId query parameter
+ */
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url)
     const userId = searchParams.get('userId')
 
-    const { data, error } = await supabase
-      .from('courses')
-      .select('*')
-      .eq('user_id', userId)
+    // If no userId provided, return all courses
+    let query = supabase.from('courses').select('*')
+    
+    if (userId) {
+      query = query.eq('user_id', userId)
+    }
+
+    const { data, error } = await query
 
     if (error) throw error
 

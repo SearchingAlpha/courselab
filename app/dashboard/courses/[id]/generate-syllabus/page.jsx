@@ -1,13 +1,44 @@
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
-import { redirect } from 'next/navigation';
+'use client';
+
+import { useState, useEffect } from 'react';
+import { redirect, useRouter } from 'next/navigation';
+import { getUser } from '@/lib/auth';
 import SyllabusGenerator from '@/components/syllabus/SyllabusGenerator';
 
-export default async function GenerateSyllabusPage({ params }) {
-  const session = await getServerSession(authOptions);
+export default function GenerateSyllabusPage({ params }) {
+  const router = useRouter();
+  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState(null);
+
+  // Check authentication
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const currentUser = await getUser();
+        
+        if (!currentUser) {
+          router.push('/auth/signin');
+          return;
+        }
+        
+        setUser(currentUser);
+      } catch (error) {
+        console.error('Error checking authentication:', error);
+        router.push('/auth/signin');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    checkAuth();
+  }, [router]);
   
-  if (!session?.user) {
-    redirect('/auth/signin');
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
+      </div>
+    );
   }
 
   return (

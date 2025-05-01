@@ -42,7 +42,7 @@ export async function PUT(request, { params }) {
     })
   } catch (error) {
     console.error('Error updating course:', error)
-    return new Response(JSON.stringify({ error: 'Failed to update course' }), {
+    return new Response(JSON.stringify({ error: 'Failed to update course', details: error.message }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },
     })
@@ -61,7 +61,7 @@ export async function DELETE(request, { params }) {
     return new Response(null, { status: 204 })
   } catch (error) {
     console.error('Error deleting course:', error)
-    return new Response(JSON.stringify({ error: 'Failed to delete course' }), {
+    return new Response(JSON.stringify({ error: 'Failed to delete course', details: error.message }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },
     })
