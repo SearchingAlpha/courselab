@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { createSupabaseClient, signIn } from '@/lib/auth';
+import { createSupabaseClient, signIn, syncAuthAcrossTabs } from '@/lib/auth';
+import AuthDebug from '@/components/common/AuthDebug';
 
 export default function SignIn() {
   const router = useRouter();
@@ -18,13 +19,20 @@ export default function SignIn() {
 
     // Check if user is already authenticated
     async function checkAuth() {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (session) {
-        // Redirect to the original destination or dashboard
-        const redirectTo = searchParams.get('redirect') || '/dashboard';
-        router.push(redirectTo);
-      } else {
+      try {
+        // First sync auth across tabs to ensure we have latest session state
+        await syncAuthAcrossTabs();
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (session) {
+          // Redirect to the original destination or dashboard
+          const redirectTo = searchParams.get('redirect') || '/dashboard';
+          router.push(redirectTo);
+        } else {
+          setIsLoading(false);
+        }
+      } catch (err) {
+        console.error("Auth check error:", err);
         setIsLoading(false);
       }
     }
@@ -41,6 +49,9 @@ export default function SignIn() {
       const { error } = await signIn(email, password);
       
       if (error) throw error;
+      
+      // After successful login, ensure auth is synced across tabs
+      await syncAuthAcrossTabs();
       
       // Redirect to the original destination or dashboard
       const redirectTo = searchParams.get('redirect') || '/dashboard';
@@ -128,6 +139,9 @@ export default function SignIn() {
           </div>
         </form>
       </div>
+      
+      {/* Auth debugging overlay (only visible in development) */}
+      <AuthDebug />
     </div>
   );
 }

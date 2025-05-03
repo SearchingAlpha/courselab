@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Menu, ChevronDown, Home, BookOpen, Code, BookType, Layout, LogOut } from 'lucide-react';
-import { createSupabaseClient, signOut } from '@/lib/auth';
+import { createSupabaseClient, signOut, syncAuthAcrossTabs } from '@/lib/auth';
+import AuthDebug from '@/components/common/AuthDebug';
 
 export default function DashboardLayout({ children }) {
   const router = useRouter();
@@ -19,6 +20,9 @@ export default function DashboardLayout({ children }) {
     // Initial auth check
     async function checkSession() {
       try {
+        // First attempt to sync auth across tabs to prevent logout issues
+        await syncAuthAcrossTabs();
+        
         const { data: { session } } = await supabase.auth.getSession();
         
         if (session?.user) {
@@ -50,6 +54,26 @@ export default function DashboardLayout({ children }) {
       subscription?.unsubscribe();
     };
   }, [router]);
+
+  // Check for focus/visibility changes to sync auth state
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    const handleVisibilityChange = async () => {
+      if (document.visibilityState === 'visible') {
+        // When tab becomes visible again, sync auth state
+        await syncAuthAcrossTabs();
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', syncAuthAcrossTabs);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', syncAuthAcrossTabs);
+    };
+  }, []);
 
   const handleSignOut = async () => {
     await signOut(true);
@@ -171,6 +195,9 @@ export default function DashboardLayout({ children }) {
         <main className="flex-1 overflow-auto bg-gray-50 p-4 md:p-6">
           {children}
         </main>
+        
+        {/* Auth debugging overlay (only visible in development) */}
+        <AuthDebug />
       </div>
       
       {/* Overlay for mobile sidebar */}
