@@ -4,11 +4,13 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { BookOpen, ArrowLeft, ChevronRight, AlertCircle, FileText, Clock, Loader } from 'lucide-react';
+import { use } from 'react';
 
 export default function ChaptersPage() {
   const params = useParams();
   const router = useRouter();
-  const courseId = params.id;
+  const resolvedParams = use(params);
+  const courseId = resolvedParams.id;
   
   const [course, setCourse] = useState(null);
   const [syllabus, setSyllabus] = useState(null);

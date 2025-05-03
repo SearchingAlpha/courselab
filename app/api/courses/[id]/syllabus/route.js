@@ -1,26 +1,34 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/auth';
+import { createClient } from '@supabase/supabase-js';
 import { generateSyllabus, analyzeSyllabus } from '@/lib/agents/syllabusAgent';
+
+// Initialize Supabase client
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+);
 
 export async function GET(req, { params }) {
   try {
-    // Authenticate using Supabase
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.user) {
+    // Get the current session
+    const { data: { session }, error: authError } = await supabase.auth.getSession();
+    if (authError || !session) {
       return new NextResponse('Unauthorized', { status: 401 });
     }
 
-    const resolvedParams = await params;
-    
     // Fetch syllabus using Supabase
-    const { data: syllabus, error } = await supabase
+    const { data: syllabus, error: syllabusError } = await supabase
       .from('syllabus')
       .select('*')
-      .eq('course_id', resolvedParams.id)
+      .eq('course_id', params.id)
       .single();
 
-    if (error) {
-      console.error('Error fetching syllabus:', error);
+    if (syllabusError && syllabusError.code !== 'PGRST116') { // PGRST116 is "not found"
+      console.error('Error fetching syllabus:', syllabusError);
+      return new NextResponse('Error fetching syllabus', { status: 500 });
+    }
+
+    if (!syllabus) {
       return new NextResponse('Syllabus not found', { status: 404 });
     }
 
@@ -28,34 +36,34 @@ export async function GET(req, { params }) {
     const searchParams = new URL(req.url).searchParams;
     if (searchParams.get('analyze') === 'true') {
       const analysis = await analyzeSyllabus(syllabus.content);
-      return NextResponse.json({ content: analysis });
+      return new NextResponse(analysis, {
+        headers: { 'Content-Type': 'text/plain' }
+      });
     }
 
     return NextResponse.json(syllabus);
   } catch (error) {
-    console.error('Error fetching syllabus:', error);
+    console.error('Error in GET syllabus:', error);
     return new NextResponse('Internal Server Error', { status: 500 });
   }
 }
 
 export async function POST(req, { params }) {
   try {
-    // Authenticate using Supabase
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.user) {
+    // Get the current session
+    const { data: { session }, error: authError } = await supabase.auth.getSession();
+    if (authError || !session) {
       return new NextResponse('Unauthorized', { status: 401 });
     }
 
-    const resolvedParams = await params;
-    
-    // Check if course exists
+    // Check if course exists and user has access
     const { data: course, error: courseError } = await supabase
       .from('courses')
       .select('*')
-      .eq('id', resolvedParams.id)
+      .eq('id', params.id)
       .single();
 
-    if (courseError) {
+    if (courseError || !course) {
       console.error('Error fetching course:', courseError);
       return new NextResponse('Course not found', { status: 404 });
     }
@@ -64,7 +72,7 @@ export async function POST(req, { params }) {
     const { data: existingSyllabus, error: syllabusError } = await supabase
       .from('syllabus')
       .select('*')
-      .eq('course_id', resolvedParams.id)
+      .eq('course_id', params.id)
       .single();
 
     // If syllabus exists and we're not regenerating, return it
@@ -75,14 +83,17 @@ export async function POST(req, { params }) {
       return NextResponse.json(existingSyllabus);
     }
 
-    // Generate new syllabus using the specialized agent
+    // Generate new syllabus content
     const content = await generateSyllabus(course);
 
     if (existingSyllabus) {
       // Update existing syllabus
       const { data: updatedSyllabus, error: updateError } = await supabase
         .from('syllabus')
-        .update({ content })
+        .update({ 
+          content,
+          updated_at: new Date().toISOString()
+        })
         .eq('id', existingSyllabus.id)
         .select()
         .single();
@@ -99,7 +110,9 @@ export async function POST(req, { params }) {
         .from('syllabus')
         .insert([{
           content,
-          course_id: resolvedParams.id
+          course_id: params.id,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
         }])
         .select()
         .single();
@@ -112,7 +125,7 @@ export async function POST(req, { params }) {
       return NextResponse.json(newSyllabus);
     }
   } catch (error) {
-    console.error('Error generating syllabus:', error);
+    console.error('Error in POST syllabus:', error);
     return new NextResponse('Internal Server Error', { status: 500 });
   }
 }

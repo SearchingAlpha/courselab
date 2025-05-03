@@ -1,70 +1,52 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { supabase, getSession, signIn, debugAuthStore } from '@/lib/auth';
+import { createSupabaseClient, signIn } from '@/lib/auth';
 
 export default function SignIn() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(true);
-  const [authChecked, setAuthChecked] = useState(false);
 
-  // Check if user is already authenticated on page load
   useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        console.log('SignIn: Checking auth state...');
-        debugAuthStore();
-        
-        // Clear any malformed data
-        if (typeof window !== 'undefined') {
-          // Check for auth session
-          const session = await getSession();
-          
-          if (session) {
-            console.log('SignIn: Valid session found, redirecting to dashboard');
-            window.location.href = '/dashboard';
-            return;
-          }
-        }
+    const supabase = createSupabaseClient();
 
-        console.log('SignIn: No valid session found, showing login form');
-      } catch (error) {
-        console.error('SignIn: Error checking auth status:', error);
-      } finally {
+    // Check if user is already authenticated
+    async function checkAuth() {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (session) {
+        // Redirect to the original destination or dashboard
+        const redirectTo = searchParams.get('redirect') || '/dashboard';
+        router.push(redirectTo);
+      } else {
         setIsLoading(false);
-        setAuthChecked(true);
       }
-    };
+    }
     
     checkAuth();
-  }, []);
+  }, [router, searchParams]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setIsLoading(true);
     setError('');
-
+    setIsLoading(true);
+    
     try {
-      console.log('SignIn: Attempting to sign in...');
-      // Use our direct signIn function
-      const result = await signIn(email, password);
+      const { error } = await signIn(email, password);
       
-      if (!result || !result.user) {
-        throw new Error('Failed to sign in');
-      }
-
-      console.log('SignIn: Successful sign in, redirecting to dashboard...');
+      if (error) throw error;
       
-      // Use hard navigation for a clean reload with the new session
-      window.location.href = '/dashboard';
+      // Redirect to the original destination or dashboard
+      const redirectTo = searchParams.get('redirect') || '/dashboard';
+      router.push(redirectTo);
     } catch (error) {
-      console.error('SignIn: Error during sign in:', error);
-      setError(error.message || 'Failed to sign in. Please try again.');
+      setError(error.message || 'Failed to sign in');
       setIsLoading(false);
     }
   };
@@ -72,7 +54,7 @@ export default function SignIn() {
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-600"></div>
       </div>
     );
   }
@@ -89,18 +71,7 @@ export default function SignIn() {
             </Link>
           </p>
         </div>
-        
-        {error && (
-          <div className="bg-red-50 border-l-4 border-red-400 p-4">
-            <div className="flex">
-              <div className="ml-3">
-                <p className="text-sm text-red-700">{error}</p>
-              </div>
-            </div>
-          </div>
-        )}
-        
-        <form onSubmit={handleSubmit} className="mt-8 space-y-6">
+        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           <div className="rounded-md shadow-sm -space-y-px">
             <div>
               <label htmlFor="email-address" className="sr-only">
@@ -136,11 +107,21 @@ export default function SignIn() {
             </div>
           </div>
 
+          {error && (
+            <div className="rounded-md bg-red-50 p-4">
+              <div className="flex">
+                <div className="ml-3">
+                  <h3 className="text-sm font-medium text-red-800">{error}</h3>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div>
             <button
               type="submit"
-              disabled={isLoading}
               className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              disabled={isLoading}
             >
               {isLoading ? 'Signing in...' : 'Sign in'}
             </button>

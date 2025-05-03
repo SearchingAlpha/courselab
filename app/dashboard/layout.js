@@ -4,112 +4,67 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Menu, ChevronDown, Home, BookOpen, Code, BookType, Layout, LogOut } from 'lucide-react';
-import { getUser, signOut, debugAuthStore, getSession, supabase } from '@/lib/auth';
+import { createSupabaseClient, signOut } from '@/lib/auth';
 
 export default function DashboardLayout({ children }) {
   const router = useRouter();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [authChecked, setAuthChecked] = useState(false);
-  
-  // Only run this once on component mount
+
+  // Initialize Supabase client with auth state
   useEffect(() => {
-    const checkAuth = async () => {
+    const supabase = createSupabaseClient();
+    
+    // Initial auth check
+    async function checkSession() {
       try {
-        console.log("Dashboard: Checking user authentication...");
-        debugAuthStore(); // Debug auth store
+        const { data: { session } } = await supabase.auth.getSession();
         
-        // First try direct session check using the auth library
-        const session = await getSession();
         if (session?.user) {
-          console.log("Dashboard: User found in session:", session.user.id);
           setUser(session.user);
           setLoading(false);
-          setAuthChecked(true);
-          return;
-        }
-        
-        // Then try the auth library getUser function
-        const currentUser = await getUser();
-        console.log("Dashboard: Auth library user check result:", currentUser);
-        
-        if (currentUser) {
-          console.log("Dashboard: User authenticated via auth library:", currentUser.email);
-          setUser(currentUser);
         } else {
-          console.log("Dashboard: No user found via auth library");
-          setUser(null);
+          // Redirect to login if no session is found
+          router.push('/auth/signin?redirect=' + encodeURIComponent(window.location.pathname));
         }
       } catch (error) {
-        console.error('Dashboard: Auth check error:', error);
-        setUser(null);
-      } finally {
+        console.error("Failed to check auth session:", error);
         setLoading(false);
-        setAuthChecked(true);
       }
-    };
-
-    checkAuth();
-  }, []);
-  
-  // Separate effect to handle redirects - with delay to avoid infinite loops
-  useEffect(() => {
-    let redirectTimer;
-    
-    if (authChecked && !user && !loading) {
-      console.log("Dashboard: Auth checked, no user, preparing to redirect...");
-      
-      // Set a small delay to avoid immediate redirect that could cause loops
-      redirectTimer = setTimeout(() => {
-        console.log("Dashboard: Redirecting to signin after delay");
-        router.push('/auth/signin');
-      }, 500);
     }
     
+    checkSession();
+    
+    // Set up auth state listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' && session?.user) {
+        setUser(session.user);
+        setLoading(false);
+      } else if (event === 'SIGNED_OUT') {
+        router.push('/auth/signin');
+      }
+    });
+
     return () => {
-      if (redirectTimer) clearTimeout(redirectTimer);
+      subscription?.unsubscribe();
     };
-  }, [authChecked, user, loading, router]);
+  }, [router]);
+
+  const handleSignOut = async () => {
+    await signOut(true);
+  };
 
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-600"></div>
       </div>
     );
   }
 
-  // Show a friendly message instead of a spinner when not authenticated
-  if (!user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="max-w-md mx-auto p-6 bg-white rounded-lg shadow-md text-center">
-          <h1 className="text-xl font-bold mb-4">Authentication Required</h1>
-          <p className="mb-6">You need to be signed in to access the dashboard.</p>
-          <button
-            onClick={() => router.push('/auth/signin')}
-            className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
-          >
-            Sign In
-          </button>
-        </div>
-      </div>
-    );
-  }
-  
   const toggleSidebar = () => {
     setIsSidebarOpen(!isSidebarOpen);
-  };
-
-  const handleSignOut = async () => {
-    try {
-      console.log("Dashboard: Signing out user...");
-      await signOut(true); // Will handle redirect internally
-    } catch (error) {
-      console.error('Dashboard: Error signing out:', error);
-      router.push('/auth/signin');
-    }
   };
   
   return (
