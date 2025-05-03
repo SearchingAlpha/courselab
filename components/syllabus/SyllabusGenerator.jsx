@@ -21,6 +21,8 @@ export default function SyllabusGenerator({ courseId }) {
   const [isLoading, setIsLoading] = useState(true);
   const [expandedSections, setExpandedSections] = useState({});
   const [activeTab, setActiveTab] = useState('content');
+  const [authDiagnostics, setAuthDiagnostics] = useState(null);
+  const [isTestingAuth, setIsTestingAuth] = useState(false);
 
   useEffect(() => {
     fetchExistingSyllabus();
@@ -57,6 +59,50 @@ export default function SyllabusGenerator({ courseId }) {
     setAnalysis('');
 
     try {
+      // Get current session token
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      let accessToken = null;
+      
+      // If session exists, use its token
+      if (session?.access_token) {
+        accessToken = session.access_token;
+      } 
+      // If no session, try to refresh it
+      else {
+        // Try refreshing the session
+        await supabase.auth.refreshSession();
+        // Check again after refresh
+        const { data: refreshData } = await supabase.auth.getSession();
+        if (refreshData.session?.access_token) {
+          accessToken = refreshData.session.access_token;
+        }
+        // If still no token, try to extract it directly from the cookie
+        else {
+          try {
+            const cookieStr = document.cookie;
+            const tokenCookie = cookieStr.split(';')
+              .map(c => c.trim())
+              .find(c => c.startsWith('sb-wwgcghsoogmsmpeseszw-auth-token='));
+            
+            if (tokenCookie) {
+              const tokenValue = decodeURIComponent(tokenCookie.split('=')[1]);
+              // Token is stored as JSON array, we need to extract the token string
+              const tokenParts = JSON.parse(tokenValue);
+              if (tokenParts && tokenParts[0]) {
+                accessToken = tokenParts[0];
+              }
+            }
+          } catch (e) {
+            console.error('Error extracting token from cookie:', e);
+          }
+        }
+      }
+      
+      if (!accessToken) {
+        throw new Error('No authentication token available. Please try logging in again.');
+      }
+
       const url = isRegenerating 
         ? `/api/courses/${courseId}/syllabus?regenerate=true` 
         : `/api/courses/${courseId}/syllabus`;
@@ -65,6 +111,7 @@ export default function SyllabusGenerator({ courseId }) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`,
         },
       });
 
@@ -91,10 +138,55 @@ export default function SyllabusGenerator({ courseId }) {
     setAnalysis('');
 
     try {
+      // Get current session token
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      let accessToken = null;
+      
+      // If session exists, use its token
+      if (session?.access_token) {
+        accessToken = session.access_token;
+      } 
+      // If no session, try to refresh it
+      else {
+        // Try refreshing the session
+        await supabase.auth.refreshSession();
+        // Check again after refresh
+        const { data: refreshData } = await supabase.auth.getSession();
+        if (refreshData.session?.access_token) {
+          accessToken = refreshData.session.access_token;
+        }
+        // If still no token, try to extract it directly from the cookie
+        else {
+          try {
+            const cookieStr = document.cookie;
+            const tokenCookie = cookieStr.split(';')
+              .map(c => c.trim())
+              .find(c => c.startsWith('sb-wwgcghsoogmsmpeseszw-auth-token='));
+            
+            if (tokenCookie) {
+              const tokenValue = decodeURIComponent(tokenCookie.split('=')[1]);
+              // Token is stored as JSON array, we need to extract the token string
+              const tokenParts = JSON.parse(tokenValue);
+              if (tokenParts && tokenParts[0]) {
+                accessToken = tokenParts[0];
+              }
+            }
+          } catch (e) {
+            console.error('Error extracting token from cookie:', e);
+          }
+        }
+      }
+      
+      if (!accessToken) {
+        throw new Error('No authentication token available. Please try logging in again.');
+      }
+
       const response = await fetch(`/api/courses/${courseId}/syllabus?analyze=true`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`,
         },
       });
 
@@ -249,6 +341,78 @@ export default function SyllabusGenerator({ courseId }) {
     return timelineData.reduce((total, module) => total + module.hours, 0) || 120;
   }, [timelineData]);
 
+  // New diagnostic function to check auth state
+  const testAuthState = async () => {
+    setIsTestingAuth(true);
+    setError('');
+    const diagnostics = { cookies: {}, localStorage: {}, session: null, apiTest: null };
+    
+    try {
+      // Check cookies
+      if (typeof document !== 'undefined') {
+        diagnostics.cookies.all = document.cookie.split(';').map(c => c.trim());
+        diagnostics.cookies.supabaseTokens = document.cookie.split(';')
+          .map(c => c.trim())
+          .filter(c => c.startsWith('sb-') || c.includes('auth'));
+      }
+      
+      // Check localStorage
+      if (typeof window !== 'undefined') {
+        diagnostics.localStorage.hasAuthStorage = !!localStorage.getItem('courseforge-auth-storage');
+        try {
+          const storageData = localStorage.getItem('courseforge-auth-storage');
+          if (storageData) {
+            const parsed = JSON.parse(storageData);
+            diagnostics.localStorage.parsedData = {
+              hasSession: !!parsed.session,
+              hasExpiresAt: !!parsed.expiresAt,
+              sessionExpiresAt: parsed.expiresAt ? new Date(parsed.expiresAt * 1000).toISOString() : null,
+              currentTime: new Date().toISOString(),
+            };
+          }
+        } catch (e) {
+          diagnostics.localStorage.parseError = e.message;
+        }
+      }
+      
+      // Check Supabase session
+      const { data, error } = await supabase.auth.getSession();
+      diagnostics.session = {
+        hasSession: !!data?.session,
+        hasError: !!error,
+        errorMessage: error?.message,
+        accessToken: data?.session?.access_token ? 'Present (truncated)' : null,
+        tokenExpiry: data?.session?.expires_at ? new Date(data.session.expires_at * 1000).toISOString() : null,
+        user: data?.session?.user?.email || null,
+      };
+      
+      // Make a test API call with explicit token
+      const testToken = data?.session?.access_token;
+      if (testToken) {
+        const testResponse = await fetch(`/api/courses/${courseId}/syllabus`, {
+          method: 'HEAD',
+          headers: {
+            'Authorization': `Bearer ${testToken}`,
+          },
+        });
+        
+        diagnostics.apiTest = {
+          status: testResponse.status,
+          ok: testResponse.ok,
+          statusText: testResponse.statusText,
+        };
+      }
+      
+      setAuthDiagnostics(diagnostics);
+      toast.success('Auth diagnostics complete');
+    } catch (err) {
+      console.error('Auth test error:', err);
+      setError(`Auth test error: ${err.message}`);
+    } finally {
+      setIsTestingAuth(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -343,6 +507,60 @@ export default function SyllabusGenerator({ courseId }) {
         )}
 
         <div className="p-6">
+          {/* Auth Diagnostics */}
+          <div className="mb-6">
+            <button
+              onClick={testAuthState}
+              disabled={isTestingAuth}
+              className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-gray-50 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            >
+              {isTestingAuth ? (
+                <>
+                  <FiRefreshCw className="animate-spin -ml-1 mr-2 h-5 w-5" />
+                  Testing Auth...
+                </>
+              ) : (
+                <>
+                  Test Authentication
+                </>
+              )}
+            </button>
+            
+            {authDiagnostics && (
+              <div className="mt-4 p-4 bg-gray-50 border border-gray-200 rounded-md">
+                <h3 className="text-lg font-medium text-gray-900 mb-2">Authentication Diagnostics</h3>
+                
+                <div className="mb-2">
+                  <h4 className="font-medium">Session:</h4>
+                  <pre className="text-xs bg-gray-100 p-2 rounded overflow-auto max-h-40">
+                    {JSON.stringify(authDiagnostics.session, null, 2)}
+                  </pre>
+                </div>
+                
+                <div className="mb-2">
+                  <h4 className="font-medium">Cookies:</h4>
+                  <pre className="text-xs bg-gray-100 p-2 rounded overflow-auto max-h-40">
+                    {JSON.stringify(authDiagnostics.cookies, null, 2)}
+                  </pre>
+                </div>
+                
+                <div className="mb-2">
+                  <h4 className="font-medium">LocalStorage:</h4>
+                  <pre className="text-xs bg-gray-100 p-2 rounded overflow-auto max-h-40">
+                    {JSON.stringify(authDiagnostics.localStorage, null, 2)}
+                  </pre>
+                </div>
+                
+                <div className="mb-2">
+                  <h4 className="font-medium">API Test:</h4>
+                  <pre className="text-xs bg-gray-100 p-2 rounded overflow-auto max-h-40">
+                    {JSON.stringify(authDiagnostics.apiTest, null, 2)}
+                  </pre>
+                </div>
+              </div>
+            )}
+          </div>
+          
           {/* Tabs */}
           {content && (
             <div className="mb-6 border-b border-gray-200">

@@ -8,11 +8,71 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 );
 
+// Common function to validate authentication
+async function validateAuth(req) {
+  // First try getting session from cookies
+  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+  
+  if (session) {
+    return { isAuthenticated: true, user: session.user };
+  }
+  
+  // If no session, check for authorization header
+  const authHeader = req.headers.get('authorization');
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.substring(7);
+    const { data, error } = await supabase.auth.getUser(token);
+    
+    if (!error && data?.user) {
+      return { isAuthenticated: true, user: data.user };
+    }
+  }
+  
+  // If still no auth, try to parse cookie directly
+  const cookies = req.headers.get('cookie');
+  if (cookies) {
+    const tokenCookie = cookies.split(';')
+      .map(c => c.trim())
+      .find(c => c.startsWith('sb-wwgcghsoogmsmpeseszw-auth-token='));
+    
+    if (tokenCookie) {
+      try {
+        // Extract token and try to verify it
+        const tokenValue = decodeURIComponent(tokenCookie.split('=')[1]);
+        // Token is stored as JSON array, we need to extract the token string
+        const tokenParts = JSON.parse(tokenValue);
+        if (tokenParts && tokenParts[0]) {
+          const token = tokenParts[0];
+          const { data, error } = await supabase.auth.getUser(token);
+          if (!error && data?.user) {
+            return { isAuthenticated: true, user: data.user };
+          }
+        }
+      } catch (e) {
+        console.error('Error parsing auth cookie:', e);
+      }
+    }
+  }
+  
+  return { isAuthenticated: false, error: 'No valid authentication found' };
+}
+
+// Support HEAD requests for auth testing
+export async function HEAD(req, { params }) {
+  const auth = await validateAuth(req);
+  
+  if (!auth.isAuthenticated) {
+    return new NextResponse('Unauthorized', { status: 401 });
+  }
+  
+  return new NextResponse(null, { status: 200 });
+}
+
 export async function GET(req, { params }) {
   try {
-    // Get the current session
-    const { data: { session }, error: authError } = await supabase.auth.getSession();
-    if (authError || !session) {
+    const auth = await validateAuth(req);
+    
+    if (!auth.isAuthenticated) {
       return new NextResponse('Unauthorized', { status: 401 });
     }
 
@@ -50,9 +110,9 @@ export async function GET(req, { params }) {
 
 export async function POST(req, { params }) {
   try {
-    // Get the current session
-    const { data: { session }, error: authError } = await supabase.auth.getSession();
-    if (authError || !session) {
+    const auth = await validateAuth(req);
+    
+    if (!auth.isAuthenticated) {
       return new NextResponse('Unauthorized', { status: 401 });
     }
 

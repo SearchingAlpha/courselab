@@ -14,6 +14,15 @@ export function Providers({ children }) {
         autoRefreshToken: true,
         detectSessionInUrl: true,
         storageKey: 'courseforge-auth-storage',
+        cookies: {
+          name: 'sb-wwgcghsoogmsmpeseszw',
+          lifetime: 60 * 60 * 24 * 7, // 7 days
+          domain: '',
+          path: '/',
+          sameSite: 'lax',
+          secure: process.env.NODE_ENV === 'production',
+        },
+        // Keep storage for backward compatibility
         storage: {
           getItem: (key) => {
             if (typeof window === 'undefined') return null;
