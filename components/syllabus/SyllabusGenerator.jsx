@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { FiFileText, FiDownload, FiRefreshCw, FiCheck, FiSearch, FiClock, FiChevronDown, FiChevronRight, FiCalendar, FiActivity, FiBook, FiLayers, FiAlertCircle } from 'react-icons/fi';
 import { motion, AnimatePresence } from 'framer-motion';
 import { createClient } from '@supabase/supabase-js';
@@ -23,32 +23,224 @@ export default function SyllabusGenerator({ courseId }) {
   const [activeTab, setActiveTab] = useState('content');
   const [authDiagnostics, setAuthDiagnostics] = useState(null);
   const [isTestingAuth, setIsTestingAuth] = useState(false);
+  const [debugLogs, setDebugLogs] = useState([]);
+  const [showDebug, setShowDebug] = useState(false);
+  const logCount = useRef(0);
+
+  // Custom debug function
+  const debug = (message) => {
+    const timestamp = new Date().toISOString().split('T')[1].split('.')[0];
+    const logMessage = `[${timestamp}] ${message}`;
+    console.log(logMessage);
+    setDebugLogs(prev => [logMessage, ...prev].slice(0, 20)); // Keep most recent 20 logs
+    logCount.current += 1;
+  };
 
   useEffect(() => {
+    // Force client-side detection
+    debug(`Client-side component mounted with courseId: ${courseId}`);
+    debug(`Browser detected: ${navigator.userAgent}`);
+    
+    // Check if this is a page refresh
+    if (performance.navigation && performance.navigation.type === 1) {
+      debug('This is a page refresh/reload');
+    }
+    
+    // Check if localStorage works
+    try {
+      localStorage.setItem('test-key', 'test-value');
+      debug('localStorage is working');
+    } catch (e) {
+      debug(`localStorage error: ${e.message}`);
+    }
+    
+    // Immediate check for localStorage cache to show content faster
+    try {
+      debug('Checking localStorage for cached syllabus on mount');
+      const cachedSyllabus = localStorage.getItem(`syllabus-${courseId}`);
+      if (cachedSyllabus) {
+        debug('Found cached data in localStorage');
+        const parsedCache = JSON.parse(cachedSyllabus);
+        if (parsedCache && parsedCache.content) {
+          debug(`Cached content found: ${parsedCache.content.length} chars`);
+          setContent(parsedCache.content);
+        } else {
+          debug('Cached data exists but has no content property');
+        }
+      } else {
+        debug('No cached syllabus found in localStorage');
+      }
+    } catch (cacheErr) {
+      debug(`Error reading from localStorage: ${cacheErr.message}`);
+    }
+    
+    // Continue with normal fetch process
     fetchExistingSyllabus();
   }, [courseId]);
 
   const fetchExistingSyllabus = async () => {
+    console.log(`Debug: Starting fetchExistingSyllabus for courseId: ${courseId}`);
+    debug(`Starting fetchExistingSyllabus for courseId: ${courseId}`);
+    setError(''); // Clear any previous errors
+    
     try {
-      const { data: syllabus, error } = await supabase
-        .from('syllabus')
-        .select('*')
-        .eq('course_id', courseId)
-        .single();
-
-      if (error && error.code !== 'PGRST116') { // PGRST116 is "not found"
-        throw error;
+      // First, check localStorage for immediate feedback
+      try {
+        const cachedSyllabus = localStorage.getItem(`syllabus-${courseId}`);
+        console.log(`Debug: Cached syllabus from localStorage:`, cachedSyllabus ? 'Found' : 'Not found');
+        if (cachedSyllabus) {
+          const parsedCache = JSON.parse(cachedSyllabus);
+          if (parsedCache && parsedCache.content) {
+            console.log(`Debug: Setting content from localStorage: ${parsedCache.content.length} chars`);
+            debug('Setting content from localStorage while waiting for API');
+            setContent(parsedCache.content);
+          }
+        }
+      } catch (cacheErr) {
+        console.log(`Debug: Error reading from localStorage:`, cacheErr);
+        debug(`Error reading from localStorage: ${cacheErr.message}`);
       }
-
-      if (syllabus) {
-        setContent(syllabus.content);
+      
+      // Follow the same auth flow as the generate button
+      debug('Getting auth token for API request');
+      console.log('Debug: Getting auth token for API request');
+      
+      // Get current session token
+      const { data: { session } } = await supabase.auth.getSession();
+      let accessToken = null;
+      
+      // If session exists, use its token
+      if (session?.access_token) {
+        accessToken = session.access_token;
+        console.log('Debug: Using existing session token');
+        debug('Using existing session token');
+      } 
+      // If no session, try to refresh it
+      else {
+        console.log('Debug: No session found, attempting to refresh');
+        debug('No session found, attempting to refresh');
+        // Try refreshing the session
+        await supabase.auth.refreshSession();
+        // Check again after refresh
+        const { data: refreshData } = await supabase.auth.getSession();
+        if (refreshData.session?.access_token) {
+          accessToken = refreshData.session.access_token;
+          console.log('Debug: Got token from session refresh');
+          debug('Got token from session refresh');
+        }
+        // If still no token, try to extract it directly from the cookie
+        else {
+          console.log('Debug: No token after refresh, trying cookie extraction');
+          debug('No token after refresh, trying cookie extraction');
+          try {
+            const cookieStr = document.cookie;
+            console.log(`Debug: Cookie string:`, cookieStr);
+            debug(`Cookie string: ${cookieStr.substring(0, 50)}...`);
+            const tokenCookie = cookieStr.split(';')
+              .map(c => c.trim())
+              .find(c => c.startsWith('sb-wwgcghsoogmsmpeseszw-auth-token='));
+            
+            if (tokenCookie) {
+              console.log('Debug: Found auth cookie, attempting to parse');
+              debug('Found auth cookie, attempting to parse');
+              const tokenValue = decodeURIComponent(tokenCookie.split('=')[1]);
+              // Token is stored as JSON array, we need to extract the token string
+              const tokenParts = JSON.parse(tokenValue);
+              if (tokenParts && tokenParts[0]) {
+                accessToken = tokenParts[0];
+                console.log('Debug: Got token from cookie');
+                debug('Got token from cookie');
+              }
+            } else {
+              console.log('Debug: No matching auth cookie found');
+              debug('No matching auth cookie found');
+            }
+          } catch (e) {
+            console.log(`Debug: Error extracting token from cookie:`, e);
+            debug(`Error extracting token from cookie: ${e.message}`);
+          }
+        }
       }
+      
+      if (!accessToken) {
+        console.log('Debug: No auth token available. Relying on localStorage content only.');
+        debug('No auth token available. Relying on localStorage content only.');
+        return;
+      }
+      
+      // Make the API call - same as in generate function
+      console.log(`Debug: Making GET request to /api/courses/${courseId}/syllabus`);
+      debug(`Making GET request to /api/courses/${courseId}/syllabus`);
+      const response = await fetch(`/api/courses/${courseId}/syllabus`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`,
+        },
+      });
+      
+      console.log(`Debug: API response status:`, response.status, response.statusText);
+      
+      if (!response.ok) {
+        if (response.status === 404) {
+          console.log('Debug: No syllabus found (404 response)');
+          debug('No syllabus found (404 response)');
+          return; // Not an error, just no syllabus yet
+        }
+        
+        // Try to get more detailed error message
+        let errorText = '';
+        try {
+          errorText = await response.text();
+          console.log(`Debug: Error response body:`, errorText);
+          debug(`Error response body: ${errorText}`);
+        } catch (e) {
+          console.log(`Debug: Could not read error response:`, e);
+          debug(`Could not read error response: ${e.message}`);
+        }
+        
+        throw new Error(`Failed to fetch syllabus: ${response.status} ${response.statusText}${errorText ? ' - ' + errorText : ''}`);
+      }
+      
+      console.log('Debug: Syllabus API request successful');
+      debug('Syllabus API request successful');
+      const data = await response.json();
+      console.log(`Debug: Received data:`, data);
+      debug(`Received data structure: ${Object.keys(data).join(', ')}`);
+      
+      if (!data.content) {
+        console.log('Debug: Response successful but no content field found in response');
+        debug('Response successful but no content field found in response');
+        return;
+      }
+      
+      console.log(`Debug: Content received: ${data.content.length} characters`);
+      debug(`Content received: ${data.content.length} characters`);
+      
+      // Cache the successful response
+      try {
+        localStorage.setItem(`syllabus-${courseId}`, JSON.stringify(data));
+        console.log('Debug: Stored syllabus in localStorage cache');
+        debug('Stored syllabus in localStorage cache');
+      } catch (storageErr) {
+        console.log(`Debug: Error storing in localStorage:`, storageErr);
+        debug(`Error storing in localStorage: ${storageErr.message}`);
+      }
+      
+      setContent(data.content);
+      console.log('Debug: Updated component state with syllabus content');
+      debug('Updated component state with syllabus content');
     } catch (error) {
-      console.error('Error fetching syllabus:', error);
-      toast.error('Failed to fetch syllabus');
-      setError('Failed to fetch syllabus');
+      console.log(`Debug: Exception in fetchExistingSyllabus:`, error);
+      debug(`Exception in fetchExistingSyllabus: ${error.message}`);
+      // Don't show error toast if we have content from localStorage
+      if (!content) {
+        setError(`Error fetching syllabus: ${error.message}`);
+      }
     } finally {
       setIsLoading(false);
+      console.log('Debug: Finished fetchExistingSyllabus');
+      debug('Finished fetchExistingSyllabus');
     }
   };
 
@@ -59,6 +251,8 @@ export default function SyllabusGenerator({ courseId }) {
     setAnalysis('');
 
     try {
+      debug(`Starting syllabus generation for courseId: ${courseId}`);
+      
       // Get current session token
       const { data: { session } } = await supabase.auth.getSession();
       
@@ -67,34 +261,41 @@ export default function SyllabusGenerator({ courseId }) {
       // If session exists, use its token
       if (session?.access_token) {
         accessToken = session.access_token;
+        debug('Using existing session token');
       } 
       // If no session, try to refresh it
       else {
+        debug('No session found, attempting to refresh');
         // Try refreshing the session
         await supabase.auth.refreshSession();
         // Check again after refresh
         const { data: refreshData } = await supabase.auth.getSession();
         if (refreshData.session?.access_token) {
           accessToken = refreshData.session.access_token;
+          debug('Got token from session refresh');
         }
         // If still no token, try to extract it directly from the cookie
         else {
+          debug('No token after refresh, trying cookie extraction');
           try {
             const cookieStr = document.cookie;
+            debug(`Cookie string: ${cookieStr.substring(0, 50)}...`);
             const tokenCookie = cookieStr.split(';')
               .map(c => c.trim())
               .find(c => c.startsWith('sb-wwgcghsoogmsmpeseszw-auth-token='));
             
             if (tokenCookie) {
+              debug('Found auth cookie, attempting to parse');
               const tokenValue = decodeURIComponent(tokenCookie.split('=')[1]);
               // Token is stored as JSON array, we need to extract the token string
               const tokenParts = JSON.parse(tokenValue);
               if (tokenParts && tokenParts[0]) {
                 accessToken = tokenParts[0];
+                debug('Got token from cookie');
               }
             }
           } catch (e) {
-            console.error('Error extracting token from cookie:', e);
+            debug(`Error extracting token from cookie: ${e.message}`);
           }
         }
       }
@@ -107,6 +308,7 @@ export default function SyllabusGenerator({ courseId }) {
         ? `/api/courses/${courseId}/syllabus?regenerate=true` 
         : `/api/courses/${courseId}/syllabus`;
       
+      debug(`Making POST request to ${url}`);
       const response = await fetch(url, {
         method: 'POST',
         headers: {
@@ -116,19 +318,50 @@ export default function SyllabusGenerator({ courseId }) {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to generate syllabus');
+        debug(`Syllabus generation failed: ${response.status} ${response.statusText}`);
+        
+        // Try to get more detailed error message
+        let errorText = '';
+        try {
+          errorText = await response.text();
+          debug(`Error response body: ${errorText}`);
+        } catch (e) {
+          debug(`Could not read error response: ${e.message}`);
+        }
+        
+        throw new Error(`Failed to generate syllabus: ${response.status} ${response.statusText}${errorText ? ' - ' + errorText : ''}`);
       }
 
+      debug('Syllabus generation successful');
       const data = await response.json();
+      debug(`Received data structure: ${Object.keys(data).join(', ')}`);
+      
+      if (!data.content) {
+        debug('Response successful but no content field found in response');
+      } else {
+        debug(`Content received: ${data.content.length} characters`);
+        // Cache the syllabus in localStorage for future use
+        try {
+          debug('Caching syllabus in localStorage');
+          localStorage.setItem(`syllabus-${courseId}`, JSON.stringify(data));
+        } catch (storageErr) {
+          debug(`Error caching syllabus in localStorage: ${storageErr.message}`);
+        }
+      }
+      
       setContent(data.content);
       setExpandedSections({});
       toast.success(isRegenerating ? 'Syllabus regenerated!' : 'Syllabus generated!');
+      
+      // Refresh the data to make sure it's consistent
+      setTimeout(() => fetchExistingSyllabus(), 1000);
     } catch (err) {
-      console.error('Error generating syllabus:', err);
+      debug(`Error generating syllabus: ${err.message}`);
       toast.error('Failed to generate syllabus');
       setError(err.message);
     } finally {
       setIsGenerating(false);
+      debug('Finished handleGenerate');
     }
   };
 
@@ -413,6 +646,45 @@ export default function SyllabusGenerator({ courseId }) {
     }
   };
 
+  const forceReload = () => {
+    debug('Forcing full reload to fetch syllabus');
+    // Clear localStorage for this course to force refetch
+    try {
+      localStorage.removeItem(`syllabus-${courseId}`);
+      debug('Cleared localStorage cache');
+    } catch (e) {
+      debug(`Error clearing localStorage: ${e.message}`);
+    }
+    
+    // Force a real page reload
+    window.location.reload();
+  };
+
+  // Add this function after forceReload
+  const checkDatabaseDirectly = async () => {
+    debug('Checking database directly for syllabus');
+    
+    try {
+      const response = await fetch(`/api/courses/${courseId}/syllabus?debug=true`);
+      const debugData = await response.json();
+      debug(`Direct database check response: ${JSON.stringify(debugData)}`);
+      
+      if (debugData.syllabusInfo) {
+        const { id, courseId, hasContent, contentLength, createdAt, updatedAt } = debugData.syllabusInfo;
+        debug(`Syllabus exists in database: ID ${id}, Content Length: ${contentLength}, Created: ${createdAt}`);
+        toast.success(`Syllabus found in database: ${contentLength} characters`);
+      } else if (debugData.message === 'Debug mode: No syllabus found') {
+        debug('No syllabus found in database');
+        toast.error('No syllabus found in database');
+      } else {
+        debug(`Unexpected debug response: ${JSON.stringify(debugData)}`);
+      }
+    } catch (e) {
+      debug(`Error in direct database check: ${e.message}`);
+      toast.error(`Database check failed: ${e.message}`);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -427,6 +699,39 @@ export default function SyllabusGenerator({ courseId }) {
       animate={{ opacity: 1, y: 0 }}
       className="max-w-7xl mx-auto space-y-6"
     >
+      {/* Debug Panel */}
+      <div className="bg-gray-800 text-white p-2 rounded-md mb-4 flex justify-between items-center">
+        <div className="flex space-x-2">
+          <button 
+            className="px-3 py-1 bg-blue-600 rounded hover:bg-blue-700 text-sm"
+            onClick={() => setShowDebug(!showDebug)}
+          >
+            {showDebug ? 'Hide Debug' : 'Show Debug'} ({logCount.current} logs)
+          </button>
+          <button 
+            className="px-3 py-1 bg-red-600 rounded hover:bg-red-700 text-sm"
+            onClick={forceReload}
+          >
+            Force Reload
+          </button>
+          <button 
+            className="px-3 py-1 bg-green-600 rounded hover:bg-green-700 text-sm"
+            onClick={checkDatabaseDirectly}
+          >
+            Check Database
+          </button>
+        </div>
+        <span className="text-xs">{`Client rendered at: ${new Date().toLocaleTimeString()}`}</span>
+      </div>
+      
+      {showDebug && (
+        <div className="bg-gray-900 text-green-400 p-4 rounded-md mb-4 font-mono text-xs max-h-60 overflow-y-auto">
+          {debugLogs.map((log, i) => (
+            <div key={i} className="mb-1">{log}</div>
+          ))}
+        </div>
+      )}
+      
       <div className="bg-white rounded-lg shadow-lg overflow-hidden">
         <div className="border-b border-gray-200 bg-gray-50 p-6">
           <div className="flex justify-between items-center">

@@ -53,20 +53,18 @@ export default function ChaptersPage() {
     fetchCourseAndSyllabus();
   }, [courseId]);
   
+  // This function is now only used as a fallback in case we want to implement chapter generation
+  // directly from this page in the future
   const handleGenerateChapter = async (moduleId, chapterTitle) => {
     setGeneratingChapter(chapterTitle);
     
     try {
-      // In a real implementation, this would call an API to generate the chapter content
-      // For now, we'll simulate a delay
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // After generation, navigate to the chapter content page
-      // In a real app, you would pass the generated chapter ID
-      router.push(`/dashboard/courses/${courseId}/textbook/module-${moduleId}/${chapterTitle.toLowerCase().replace(/\s+/g, '-')}`);
+      // Navigate to the textbook page which will handle the generation
+      const chapterId = chapterTitle.toLowerCase().replace(/\s+/g, '-');
+      router.push(`/dashboard/courses/${courseId}/textbook/module-${moduleId}/${chapterId}`);
     } catch (err) {
-      console.error('Error generating chapter:', err);
-      setError('Failed to generate chapter. Please try again.');
+      console.error('Error navigating to chapter:', err);
+      setError('Failed to open chapter. Please try again.');
       setGeneratingChapter(null);
     }
   };
@@ -196,28 +194,17 @@ export default function ChaptersPage() {
                             <Clock size={14} className="mr-1" />
                             {chapter.hours} hours
                           </div>
+                          <p className="text-sm text-gray-600 mt-2">
+                            {chapter.description || "No description available."}
+                          </p>
                         </div>
-                        <button
-                          onClick={() => handleGenerateChapter(module.id, chapter.title)}
-                          disabled={generatingChapter === chapter.title}
-                          className={`inline-flex items-center px-3 py-1.5 rounded-md text-sm font-medium ${
-                            generatingChapter === chapter.title
-                              ? 'bg-gray-100 text-gray-500 cursor-not-allowed'
-                              : 'bg-blue-50 text-blue-700 hover:bg-blue-100'
-                          }`}
+                        <Link
+                          href={`/dashboard/courses/${courseId}/textbook/module-${module.id}/${chapter.title.toLowerCase().replace(/\s+/g, '-')}`}
+                          className="inline-flex items-center px-3 py-1.5 rounded-md text-sm font-medium bg-blue-600 text-white hover:bg-blue-700"
                         >
-                          {generatingChapter === chapter.title ? (
-                            <>
-                              <Loader size={14} className="mr-1.5 animate-spin" />
-                              Generating...
-                            </>
-                          ) : (
-                            <>
-                              <FileText size={14} className="mr-1.5" />
-                              Generate
-                            </>
-                          )}
-                        </button>
+                          <BookOpen size={14} className="mr-1.5" />
+                          Open Textbook
+                        </Link>
                       </div>
                     </div>
                   ))}

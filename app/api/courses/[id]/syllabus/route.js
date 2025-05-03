@@ -10,50 +10,74 @@ const supabase = createClient(
 
 // Common function to validate authentication
 async function validateAuth(req) {
+  console.log('Starting auth validation...');
+  
   // First try getting session from cookies
   const { data: { session }, error: sessionError } = await supabase.auth.getSession();
   
   if (session) {
+    console.log('Auth found via session');
     return { isAuthenticated: true, user: session.user };
+  } else {
+    console.log('No session found, checking other methods');
   }
   
   // If no session, check for authorization header
   const authHeader = req.headers.get('authorization');
   if (authHeader && authHeader.startsWith('Bearer ')) {
     const token = authHeader.substring(7);
+    console.log('Auth header found, validating token');
     const { data, error } = await supabase.auth.getUser(token);
     
     if (!error && data?.user) {
+      console.log('Valid user found from auth header');
       return { isAuthenticated: true, user: data.user };
+    } else {
+      console.log('Invalid token in auth header:', error);
     }
+  } else {
+    console.log('No auth header found or invalid format');
   }
   
   // If still no auth, try to parse cookie directly
   const cookies = req.headers.get('cookie');
   if (cookies) {
+    console.log('Cookies found, searching for auth token');
     const tokenCookie = cookies.split(';')
       .map(c => c.trim())
       .find(c => c.startsWith('sb-wwgcghsoogmsmpeseszw-auth-token='));
     
     if (tokenCookie) {
       try {
+        console.log('Auth token cookie found, attempting to parse');
         // Extract token and try to verify it
         const tokenValue = decodeURIComponent(tokenCookie.split('=')[1]);
         // Token is stored as JSON array, we need to extract the token string
         const tokenParts = JSON.parse(tokenValue);
         if (tokenParts && tokenParts[0]) {
           const token = tokenParts[0];
+          console.log('Token extracted from cookie, validating');
           const { data, error } = await supabase.auth.getUser(token);
           if (!error && data?.user) {
+            console.log('Valid user found from cookie token');
             return { isAuthenticated: true, user: data.user };
+          } else {
+            console.log('Invalid token from cookie:', error);
           }
+        } else {
+          console.log('No token parts found in cookie');
         }
       } catch (e) {
         console.error('Error parsing auth cookie:', e);
       }
+    } else {
+      console.log('No auth token cookie found');
     }
+  } else {
+    console.log('No cookies found in request');
   }
   
+  console.log('All auth methods failed');
   return { isAuthenticated: false, error: 'No valid authentication found' };
 }
 
@@ -140,6 +164,9 @@ async function verifyUserCourseAccess(adminClient, databaseUserId, courseId) {
 
 // Support HEAD requests for auth testing
 export async function HEAD(req, { params }) {
+  // Fix: Properly await params
+  const paramsObject = await params;
+  
   const auth = await validateAuth(req);
   
   if (!auth.isAuthenticated) {
@@ -151,14 +178,81 @@ export async function HEAD(req, { params }) {
 
 export async function GET(req, { params }) {
   try {
+    console.log('GET syllabus request received');
+    // Check if this is a debug request
+    const url = new URL(req.url);
+    const debug = url.searchParams.get('debug') === 'true';
+    
+    if (debug) {
+      console.log('Debug request received for syllabus');
+      // Create admin client for direct database access
+      const adminClient = createAdminClient();
+      const paramsObject = await params;
+      const courseId = paramsObject.id;
+      
+      // Directly query the database without auth checks
+      const { data: syllabus, error: syllabusError } = await adminClient
+        .from('syllabus')
+        .select('*')
+        .eq('course_id', courseId)
+        .single();
+      
+      if (syllabusError) {
+        console.error('Debug: Error fetching syllabus:', syllabusError);
+        return new NextResponse(JSON.stringify({ 
+          error: syllabusError,
+          message: 'Debug mode: Error fetching syllabus'
+        }), { 
+          status: 500,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+      
+      if (!syllabus) {
+        console.log('Debug: No syllabus found for courseId:', courseId);
+        return new NextResponse(JSON.stringify({ 
+          message: 'Debug mode: No syllabus found' 
+        }), { 
+          status: 404,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+      
+      console.log('Debug: Syllabus found:', { 
+        id: syllabus.id, 
+        courseId: syllabus.course_id,
+        contentLength: syllabus.content?.length || 0
+      });
+      
+      return new NextResponse(JSON.stringify({
+        message: 'Debug mode: Syllabus found',
+        syllabusInfo: {
+          id: syllabus.id,
+          courseId: syllabus.course_id,
+          hasContent: !!syllabus.content,
+          contentLength: syllabus.content?.length || 0,
+          createdAt: syllabus.created_at,
+          updatedAt: syllabus.updated_at
+        }
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+    
+    // Regular flow continues...
     const auth = await validateAuth(req);
     
     if (!auth.isAuthenticated) {
+      console.log('Authentication failed for GET syllabus');
       return new NextResponse('Unauthorized', { status: 401 });
     }
 
-    // Get the course ID
-    const { id: courseId } = params;
+    console.log('Authenticated user:', auth.user.email);
+    
+    const paramsObject = await params;
+    const courseId = paramsObject.id;
+    console.log('Fetching syllabus for course:', courseId);
 
     // Get admin client
     const adminClient = createAdminClient();
@@ -167,6 +261,7 @@ export async function GET(req, { params }) {
     const databaseUserId = await getDatabaseUserId(auth.user);
     
     if (!databaseUserId) {
+      console.log('User not found in database for email:', auth.user.email);
       return new NextResponse('User not found in database', { status: 404 });
     }
 
@@ -174,24 +269,37 @@ export async function GET(req, { params }) {
     const hasAccess = await verifyUserCourseAccess(adminClient, databaseUserId, courseId);
     
     if (!hasAccess) {
+      console.log(`User ${databaseUserId} does not have access to course ${courseId}`);
       return new NextResponse('You do not have access to this course', { status: 403 });
     }
 
+    console.log('Access verified for course:', courseId);
+
     // Fetch syllabus using admin access
+    console.log('Querying syllabus table for course_id:', courseId);
     const { data: syllabus, error: syllabusError } = await adminClient
       .from('syllabus')
       .select('*')
       .eq('course_id', courseId)
       .single();
 
-    if (syllabusError && syllabusError.code !== 'PGRST116') { // PGRST116 is "not found"
+    if (syllabusError) {
+      if (syllabusError.code === 'PGRST116') { // "not found"
+        console.log('Syllabus not found for course:', courseId, 'Error code:', syllabusError.code);
+        return new NextResponse('Syllabus not found', { status: 404 });
+      }
       console.error('Error fetching syllabus:', syllabusError);
       return new NextResponse('Error fetching syllabus', { status: 500 });
     }
 
     if (!syllabus) {
+      console.log('Syllabus not found (null result) for course:', courseId);
       return new NextResponse('Syllabus not found', { status: 404 });
     }
+
+    console.log('Syllabus found, returning data with keys:', Object.keys(syllabus));
+    console.log('Content length:', syllabus.content?.length || 0);
+    console.log('Content preview:', syllabus.content?.substring(0, 100) + '...');
 
     // If analysis is requested, provide feedback on the syllabus
     const searchParams = new URL(req.url).searchParams;
@@ -211,14 +319,19 @@ export async function GET(req, { params }) {
 
 export async function POST(req, { params }) {
   try {
+    console.log('POST syllabus request received for course:', params.id);
     const auth = await validateAuth(req);
     
     if (!auth.isAuthenticated) {
+      console.log('Authentication failed for POST syllabus');
       return new NextResponse('Unauthorized', { status: 401 });
     }
 
-    // Get the course ID
-    const { id: courseId } = params;
+    console.log('Authenticated user:', auth.user.email);
+
+    const paramsObject = await params;
+    const courseId = paramsObject.id;
+    console.log('Generating/updating syllabus for course:', courseId);
     
     // Get admin client
     const adminClient = createAdminClient();
@@ -269,14 +382,20 @@ export async function POST(req, { params }) {
     const regenerate = searchParams.get('regenerate') === 'true';
     
     if (existingSyllabus && !regenerate) {
+      console.log('Using existing syllabus (not regenerating)');
       return NextResponse.json(existingSyllabus);
     }
 
     // Generate new syllabus content
+    console.log('Generating new syllabus content');
     const content = await generateSyllabus(course);
+    
+    console.log(`Generated content length: ${content.length} characters`);
 
+    let result;
     if (existingSyllabus) {
       // Update existing syllabus
+      console.log('Updating existing syllabus');
       const { data: updatedSyllabus, error: updateError } = await adminClient
         .from('syllabus')
         .update({ 
@@ -292,9 +411,10 @@ export async function POST(req, { params }) {
         return new NextResponse('Failed to update syllabus', { status: 500 });
       }
 
-      return NextResponse.json(updatedSyllabus);
+      result = updatedSyllabus;
     } else {
       // Create a new syllabus
+      console.log('Creating new syllabus');
       const { data: newSyllabus, error: createError } = await adminClient
         .from('syllabus')
         .insert([{
@@ -311,11 +431,16 @@ export async function POST(req, { params }) {
         return new NextResponse(`Failed to create syllabus: ${JSON.stringify(createError)}`, { status: 500 });
       }
 
-      return NextResponse.json(newSyllabus);
+      result = newSyllabus;
     }
+    
+    console.log('Operation successful, returning result with keys:', Object.keys(result));
+    console.log('Result content length:', result.content?.length || 0);
+    
+    return NextResponse.json(result);
   } catch (error) {
     console.error('Error in POST syllabus:', error);
-    return new NextResponse('Internal Server Error', { status: 500 });
+    return new NextResponse(`Internal Server Error: ${error.message}`, { status: 500 });
   }
 }
 
