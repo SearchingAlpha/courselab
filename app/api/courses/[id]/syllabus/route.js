@@ -57,6 +57,87 @@ async function validateAuth(req) {
   return { isAuthenticated: false, error: 'No valid authentication found' };
 }
 
+// Create a direct database client that bypasses RLS
+// This is needed because we can't reliably get the session token in API routes
+function createAdminClient() {
+  // Check if we have the service role key
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    console.error('SUPABASE_SERVICE_ROLE_KEY environment variable is not set');
+    throw new Error('Missing required service role key for admin access');
+  }
+  
+  // Create a service role client that bypasses RLS
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY,
+    {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false
+      }
+    }
+  );
+}
+
+// Get the database user ID associated with the authenticated user's email
+async function getDatabaseUserId(authUser) {
+  if (!authUser || !authUser.email) {
+    console.error('Missing auth user or email');
+    return null;
+  }
+
+  try {
+    const adminClient = createAdminClient();
+    
+    // Look up the user in the database by email
+    const { data, error } = await adminClient
+      .from('users')
+      .select('id')
+      .eq('email', authUser.email)
+      .single();
+    
+    if (error || !data) {
+      console.error('Error getting database user ID:', error);
+      return null;
+    }
+    
+    console.log('Found database user ID:', data.id, 'for email:', authUser.email);
+    return data.id;
+  } catch (error) {
+    console.error('Exception getting database user ID:', error);
+    return null;
+  }
+}
+
+// Verify user has access to course
+async function verifyUserCourseAccess(adminClient, databaseUserId, courseId) {
+  if (!databaseUserId || !courseId) {
+    return false;
+  }
+
+  try {
+    // Check if course exists and belongs to user
+    const { data, error } = await adminClient
+      .from('courses')
+      .select('id, user_id')
+      .eq('id', courseId)
+      .single();
+
+    if (error || !data) {
+      console.error('Error verifying course access:', error);
+      return false;
+    }
+
+    console.log('Course user_id:', data.user_id, 'Database user_id:', databaseUserId);
+    
+    // Compare the course's user_id with the database user ID
+    return data.user_id === databaseUserId;
+  } catch (error) {
+    console.error('Exception verifying course access:', error);
+    return false;
+  }
+}
+
 // Support HEAD requests for auth testing
 export async function HEAD(req, { params }) {
   const auth = await validateAuth(req);
@@ -76,11 +157,31 @@ export async function GET(req, { params }) {
       return new NextResponse('Unauthorized', { status: 401 });
     }
 
-    // Fetch syllabus using Supabase
-    const { data: syllabus, error: syllabusError } = await supabase
+    // Get the course ID
+    const { id: courseId } = params;
+
+    // Get admin client
+    const adminClient = createAdminClient();
+
+    // Get database user ID
+    const databaseUserId = await getDatabaseUserId(auth.user);
+    
+    if (!databaseUserId) {
+      return new NextResponse('User not found in database', { status: 404 });
+    }
+
+    // Verify user has access to this course
+    const hasAccess = await verifyUserCourseAccess(adminClient, databaseUserId, courseId);
+    
+    if (!hasAccess) {
+      return new NextResponse('You do not have access to this course', { status: 403 });
+    }
+
+    // Fetch syllabus using admin access
+    const { data: syllabus, error: syllabusError } = await adminClient
       .from('syllabus')
       .select('*')
-      .eq('course_id', params.id)
+      .eq('course_id', courseId)
       .single();
 
     if (syllabusError && syllabusError.code !== 'PGRST116') { // PGRST116 is "not found"
@@ -116,11 +217,39 @@ export async function POST(req, { params }) {
       return new NextResponse('Unauthorized', { status: 401 });
     }
 
-    // Check if course exists and user has access
-    const { data: course, error: courseError } = await supabase
+    // Get the course ID
+    const { id: courseId } = params;
+    
+    // Get admin client
+    const adminClient = createAdminClient();
+
+    // Get database user ID
+    const databaseUserId = await getDatabaseUserId(auth.user);
+    
+    if (!databaseUserId) {
+      console.error('User not found in database for email:', auth.user.email);
+      return new NextResponse('User not found in database', { status: 404 });
+    }
+    
+    console.log('Auth user ID:', auth.user.id);
+    console.log('Database user ID:', databaseUserId);
+    console.log('Requested course:', courseId);
+
+    // Verify user has access to this course
+    const hasAccess = await verifyUserCourseAccess(adminClient, databaseUserId, courseId);
+    
+    if (!hasAccess) {
+      console.error(`User ${databaseUserId} does not have access to course ${courseId}`);
+      return new NextResponse('You do not have access to this course', { status: 403 });
+    }
+
+    console.log('Access verified for course:', courseId);
+    
+    // Check if course exists
+    const { data: course, error: courseError } = await adminClient
       .from('courses')
       .select('*')
-      .eq('id', params.id)
+      .eq('id', courseId)
       .single();
 
     if (courseError || !course) {
@@ -129,10 +258,10 @@ export async function POST(req, { params }) {
     }
 
     // Check if syllabus already exists
-    const { data: existingSyllabus, error: syllabusError } = await supabase
+    const { data: existingSyllabus, error: syllabusError } = await adminClient
       .from('syllabus')
       .select('*')
-      .eq('course_id', params.id)
+      .eq('course_id', courseId)
       .single();
 
     // If syllabus exists and we're not regenerating, return it
@@ -148,7 +277,7 @@ export async function POST(req, { params }) {
 
     if (existingSyllabus) {
       // Update existing syllabus
-      const { data: updatedSyllabus, error: updateError } = await supabase
+      const { data: updatedSyllabus, error: updateError } = await adminClient
         .from('syllabus')
         .update({ 
           content,
@@ -166,11 +295,11 @@ export async function POST(req, { params }) {
       return NextResponse.json(updatedSyllabus);
     } else {
       // Create a new syllabus
-      const { data: newSyllabus, error: createError } = await supabase
+      const { data: newSyllabus, error: createError } = await adminClient
         .from('syllabus')
         .insert([{
           content,
-          course_id: params.id,
+          course_id: courseId,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         }])
@@ -179,7 +308,7 @@ export async function POST(req, { params }) {
 
       if (createError) {
         console.error('Error creating syllabus:', createError);
-        return new NextResponse('Failed to create syllabus', { status: 500 });
+        return new NextResponse(`Failed to create syllabus: ${JSON.stringify(createError)}`, { status: 500 });
       }
 
       return NextResponse.json(newSyllabus);
