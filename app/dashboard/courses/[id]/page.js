@@ -10,8 +10,8 @@ export default function CoursePage() {
   const courseId = params.id;
   
   useEffect(() => {
-    // Redirect to the textbook page by default
-    router.push(`/dashboard/courses/${courseId}/textbook`);
+    // Redirect to the syllabus page by default
+    router.push(`/dashboard/courses/${courseId}/syllabus`);
   }, [courseId, router]);
   
   return (

@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@supabase/supabase-js';
-import { BookOpen, ArrowLeft, ChevronRight, AlertCircle, FileText, Clock, Loader, Book } from 'lucide-react';
+import { BookOpen, ArrowLeft, ChevronRight, AlertCircle, FileText, Clock, Loader, Book, Wand2, BookText, Sparkles, Download } from 'lucide-react';
 
 // Initialize Supabase client
 const supabase = createClient(
@@ -12,7 +12,7 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 );
 
-export default function TextbookLandingPage() {
+export default function TextbookPage() {
   const params = useParams();
   const router = useRouter();
   const courseId = params.id;
@@ -21,6 +21,7 @@ export default function TextbookLandingPage() {
   const [syllabus, setSyllabus] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
   const [chapters, setChapters] = useState([]);
   
   useEffect(() => {
@@ -97,6 +98,18 @@ export default function TextbookLandingPage() {
     fetchCourseAndSyllabus();
   }, [courseId]);
   
+  const handleGenerateTextbook = async () => {
+    setIsGenerating(true);
+    // This is a placeholder for the actual textbook generation functionality
+    // We'll implement the backend later
+    setTimeout(() => {
+      setIsGenerating(false);
+      // Placeholder for successful generation - in real implementation, we would refresh the data
+      // or redirect to the first chapter
+      alert('Textbook generation functionality will be implemented in the backend.');
+    }, 2000);
+  };
+  
   if (isLoading) {
     return (
       <div className="min-h-[50vh] flex items-center justify-center">
@@ -127,37 +140,7 @@ export default function TextbookLandingPage() {
   }
   
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8">
-      {/* Header section */}
-      <div className="mb-8">
-        <div className="flex justify-between items-start">
-          <div>
-            <Link
-              href={`/dashboard/courses/${courseId}/chapters`}
-              className="inline-flex items-center text-gray-600 hover:text-gray-900 mb-4"
-            >
-              <ArrowLeft size={16} className="mr-1" />
-              <span>Back to Chapters</span>
-            </Link>
-            
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">{course.title} Textbook</h1>
-            <p className="text-gray-600 mb-4">
-              AI-generated comprehensive textbook for your course on {course.topic}
-            </p>
-          </div>
-          
-          <div className="flex space-x-2">
-            <Link
-              href={`/dashboard/courses/${courseId}/chapters`}
-              className="px-4 py-2 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 inline-flex items-center"
-            >
-              <Clock size={16} className="mr-1.5" />
-              <span>View Chapters</span>
-            </Link>
-          </div>
-        </div>
-      </div>
-      
+    <div className="bg-white rounded-lg shadow-sm p-8">
       {error && (
         <div className="mb-6 bg-red-50 border-l-4 border-red-400 p-4 flex items-start">
           <AlertCircle size={20} className="text-red-500 mt-0.5 mr-3 flex-shrink-0" />
@@ -165,15 +148,24 @@ export default function TextbookLandingPage() {
         </div>
       )}
       
-      {/* Textbook introduction */}
-      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-8 mb-12">
+      <div className="max-w-3xl mx-auto text-center mb-8">
+        <div className="bg-blue-100 p-3 rounded-full inline-flex items-center justify-center mb-4">
+          <BookOpen size={24} className="text-blue-600" />
+        </div>
+        <h1 className="text-2xl font-bold text-gray-900 mb-2">AI-Generated Textbook</h1>
+        <p className="text-gray-600">
+          Generate a comprehensive textbook based on your course syllabus.
+        </p>
+      </div>
+      
+      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-8 mb-8">
         <div className="flex flex-col md:flex-row items-center gap-8">
           <div className="w-full md:w-1/3 flex justify-center">
             <div className="relative w-56 h-72 bg-white rounded-lg shadow-lg transform rotate-1 overflow-hidden">
               <div className="absolute inset-0 p-6 flex flex-col">
-                <BookOpen size={28} className="text-blue-600 mb-3" />
+                <BookText size={28} className="text-blue-600 mb-3" />
                 <h3 className="text-lg font-bold text-gray-900 mb-1 line-clamp-2">{course.title}</h3>
-                <p className="text-xs text-gray-500 mb-6 line-clamp-2">AI-Generated Textbook</p>
+                <p className="text-xs text-gray-500 mb-6 line-clamp-2">Interactive Textbook</p>
                 <div className="flex-grow flex items-end">
                   <p className="text-sm text-blue-600 font-medium">Generated with Claude AI</p>
                 </div>
@@ -182,99 +174,111 @@ export default function TextbookLandingPage() {
           </div>
           
           <div className="w-full md:w-2/3">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">Your Custom AI-Generated Textbook</h2>
+            <h2 className="text-xl font-bold text-gray-900 mb-4">Ready to Create Your Textbook</h2>
             <p className="text-gray-700 mb-4">
-              The textbook is generated based on your specific course preferences, learning goals, and syllabus.
-              Each chapter provides comprehensive coverage with clear explanations, examples, and exercises.
+              Your textbook will include comprehensive explanations, examples, and visual aids based on your syllabus.
+              Each chapter will cover the topics outlined in your course structure.
             </p>
             
             <div className="bg-white bg-opacity-70 rounded-lg p-4 mb-4">
-              <h3 className="font-medium text-blue-900 mb-2">Textbook Features:</h3>
+              <h3 className="font-medium text-blue-900 mb-2">What You'll Get:</h3>
               <ul className="space-y-2">
                 <li className="flex items-start">
                   <div className="bg-blue-100 rounded-full p-1 mr-2 mt-0.5">
-                    <ChevronRight size={12} className="text-blue-700" />
+                    <Sparkles size={12} className="text-blue-700" />
                   </div>
                   <span className="text-gray-700">
-                    <span className="font-medium">Customized Content:</span> Tailored to your knowledge level ({course.knowledge_level})
+                    <span className="font-medium">Comprehensive Content:</span> Detailed explanations for each chapter
                   </span>
                 </li>
                 <li className="flex items-start">
                   <div className="bg-blue-100 rounded-full p-1 mr-2 mt-0.5">
-                    <ChevronRight size={12} className="text-blue-700" />
+                    <Sparkles size={12} className="text-blue-700" />
                   </div>
                   <span className="text-gray-700">
-                    <span className="font-medium">Focus:</span> {course.focus === 'math-heavy' ? 'Mathematical concepts and formal proofs' : 
-                            course.focus === 'practical' ? 'Practical applications and code examples' : 
-                            'Balanced mix of theory and practice'}
+                    <span className="font-medium">Customized Approach:</span> Content tailored to your specified teaching style and difficulty level
                   </span>
                 </li>
                 <li className="flex items-start">
                   <div className="bg-blue-100 rounded-full p-1 mr-2 mt-0.5">
-                    <ChevronRight size={12} className="text-blue-700" />
+                    <Sparkles size={12} className="text-blue-700" />
                   </div>
                   <span className="text-gray-700">
-                    <span className="font-medium">Approach:</span> {course.approach === 'visual' ? 'Visual explanations with detailed descriptions' : 
-                              course.approach === 'text' ? 'Clear textual explanations with precise definitions' : 
-                              'Mix of visual and textual explanations'}
+                    <span className="font-medium">Interactive Format:</span> Easily navigate between chapters and modules
                   </span>
                 </li>
               </ul>
             </div>
             
-            <p className="text-gray-600 text-sm">
-              Each chapter is generated on-demand and can be customized further if needed.
+            <button
+              onClick={handleGenerateTextbook}
+              disabled={isGenerating}
+              className={`mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white ${
+                isGenerating ? 'bg-blue-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'
+              }`}
+            >
+              {isGenerating ? (
+                <>
+                  <Loader size={16} className="animate-spin mr-2" />
+                  Generating Textbook...
+                </>
+              ) : (
+                <>
+                  <Wand2 size={16} className="mr-2" />
+                  Generate Textbook
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+      
+      <div className="mb-8">
+        <h2 className="text-xl font-bold text-gray-900 mb-6">Textbook Generation Process</h2>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="p-6 border border-gray-200 rounded-lg bg-white">
+            <div className="bg-blue-100 w-12 h-12 rounded-full flex items-center justify-center mb-4">
+              <div className="text-lg font-bold text-blue-600">1</div>
+            </div>
+            <h3 className="font-medium text-gray-900 mb-2">Analysis</h3>
+            <p className="text-sm text-gray-600">
+              Our AI analyzes your course structure, learning objectives, and syllabus to understand the scope and requirements.
+            </p>
+          </div>
+          
+          <div className="p-6 border border-gray-200 rounded-lg bg-white">
+            <div className="bg-blue-100 w-12 h-12 rounded-full flex items-center justify-center mb-4">
+              <div className="text-lg font-bold text-blue-600">2</div>
+            </div>
+            <h3 className="font-medium text-gray-900 mb-2">Content Creation</h3>
+            <p className="text-sm text-gray-600">
+              Each chapter is generated with detailed explanations, examples, and visuals based on your preferences.
+            </p>
+          </div>
+          
+          <div className="p-6 border border-gray-200 rounded-lg bg-white">
+            <div className="bg-blue-100 w-12 h-12 rounded-full flex items-center justify-center mb-4">
+              <div className="text-lg font-bold text-blue-600">3</div>
+            </div>
+            <h3 className="font-medium text-gray-900 mb-2">Delivery</h3>
+            <p className="text-sm text-gray-600">
+              The complete textbook is organized into an easy-to-navigate format that integrates with your course.
             </p>
           </div>
         </div>
       </div>
       
-      {/* Chapters grid */}
-      <div className="mb-12">
-        <h2 className="text-xl font-bold text-gray-900 mb-6">Textbook Chapters</h2>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {chapters.map((chapter, index) => (
-            <div 
-              key={index} 
-              className="border border-gray-200 rounded-lg overflow-hidden hover:border-blue-200 transition-colors hover:shadow-md"
-            >
-              <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
-                <div className="text-xs text-gray-500 mb-1">Module {chapter.moduleId}</div>
-                <h3 className="font-medium text-gray-900 line-clamp-1">{chapter.title}</h3>
-              </div>
-              
-              <div className="p-4">
-                <p className="text-sm text-gray-600 mb-4 line-clamp-3">
-                  {chapter.description || `This chapter covers key concepts related to ${chapter.title}.`}
-                </p>
-                
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center text-sm text-gray-500">
-                    <Clock size={14} className="mr-1" />
-                    {chapter.hours} hours
-                  </div>
-                  
-                  <Link
-                    href={`/dashboard/courses/${courseId}/textbook/module-${chapter.moduleId}/${chapter.title.toLowerCase().replace(/\s+/g, '-')}`}
-                    className="inline-flex items-center px-3 py-1.5 rounded-md text-sm font-medium bg-blue-600 text-white hover:bg-blue-700"
-                  >
-                    {chapter.isGenerated ? (
-                      <>
-                        <Book size={14} className="mr-1.5" />
-                        Read
-                      </>
-                    ) : (
-                      <>
-                        <BookOpen size={14} className="mr-1.5" />
-                        Open
-                      </>
-                    )}
-                  </Link>
-                </div>
-              </div>
-            </div>
-          ))}
+      <div className="bg-gray-50 rounded-lg p-6 border border-gray-200">
+        <div className="flex items-start">
+          <Download size={20} className="text-blue-600 mt-0.5 mr-3 flex-shrink-0" />
+          <div>
+            <h3 className="font-medium text-gray-900 mb-1">Ready to begin?</h3>
+            <p className="text-gray-600 text-sm mb-4">
+              Click the "Generate Textbook" button above to create a comprehensive textbook for your course. 
+              The process may take a few minutes depending on the size of your syllabus.
+            </p>
+          </div>
         </div>
       </div>
     </div>
